@@ -1,0 +1,134 @@
+[
+ {
+  "docstatus": 0,
+  "doctype": "Client Script",
+  "dt": "Project",
+  "enabled": 1,
+  "modified": "2025-04-08 23:16:40.394622",
+  "module": "convert In word to Vietnamese",
+  "name": "Project custom field",
+  "script": "frappe.ui.form.on('Project', {\n\trefresh: function(frm) {\n\t\t// your code here\n\t\tcur_frm.fields_dict['custom_chỉ_huy_dự_án'].get_query = function(doc) {\n            return {\n                filters: {\n                    'enabled': 1,\n                    'role_profile_name': 'Chỉ huy dự án'\n                }\n            };\n        };\n\t\t\n\t\t\n\t\t\n\t}\n})\n",
+  "view": "Form"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Client Script",
+  "dt": "Task",
+  "enabled": 1,
+  "modified": "2025-04-08 23:16:40.294711",
+  "module": "convert In word to Vietnamese",
+  "name": "FILTER TASK",
+  "script": "frappe.listview_settings['Task'] = {\n\tonload: function(listview) {\n\t\tfrappe.route_options = {\n\t\t\t\"status\": [\"!=\", \"Completed\"],\n\t\t\t\"workflow_state\": [\"!=\", \"Bản nháp\"]\n\t\t};\n\t}\n};",
+  "view": "List"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Client Script",
+  "dt": "Employee Attendance Tool",
+  "enabled": 0,
+  "modified": "2025-04-08 23:16:40.204467",
+  "module": "convert In word to Vietnamese",
+  "name": "Attendant",
+  "script": "frappe.ui.form.on('Employee Attendance Tool', {\nrefresh (frm) {\n\t\n\t\tfrm.set_value = {\n\t\t\t\"company\" : \"Phu Chau Company\"\n\t\t\t\n\t\t};\n\t}\n})",
+  "view": "Form"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Client Script",
+  "dt": "Salary Slip",
+  "enabled": 1,
+  "modified": "2025-04-08 23:16:40.119804",
+  "module": "convert In word to Vietnamese",
+  "name": "Tính unmarkded days",
+  "script": "frappe.ui.form.on('Salary Slip', {\n    \n    // Thực hiện khi form được nạp hoặc có thay đổi\n    onload: function(frm) {\n        // Gọi hàm tính toán khi form được tải\n        if (frm.doc.employee && frm.doc.start_date && frm.doc.end_date) {\n            calculate_unmarked_days(frm);\n        }\n    },\n    employee: function(frm) {\n        // Khi nhân viên thay đổi, tính toán lại\n        if (frm.doc.employee && frm.doc.start_date && frm.doc.end_date) {\n            calculate_unmarked_days(frm);\n        }\n    },\n    start_date: function(frm) {\n        // Khi ngày bắt đầu thay đổi, tính toán lại\n        if (frm.doc.employee && frm.doc.start_date && frm.doc.end_date) {\n            calculate_unmarked_days(frm);\n        }\n    },\n    end_date: function(frm) {\n        // Khi ngày kết thúc thay đổi, tính toán lại\n        if (frm.doc.employee && frm.doc.start_date && frm.doc.end_date) {\n            calculate_unmarked_days(frm);\n        }\n    }\n});\n\nfunction calculate_unmarked_days(frm) {\n    frappe.call({\n        method: 'hrms.hr.doctype.attendance.attendance.get_unmarked_days',\n        args: {\n            employee: frm.doc.employee,\n            from_date: frm.doc.start_date,\n            to_date: frm.doc.end_date,\n            exclude_holidays: frm.doc.exclude_holidays || 0\n        },\n        callback: function(response) {\n            if (response.message) {\n                var unmarkedDaysCount = response.message.length; // Đếm số ngày chưa được đánh dấu\n                frm.set_value('unmarked_days', unmarkedDaysCount); // Cập nhật trường OT với số ngày chưa được đánh dấu\n            } else {\n                frm.set_value('unmarked_days', 0); // Nếu không có ngày nào chưa được đánh dấu, đặt giá trị là 0\n            }\n        }\n    });\n}\n",
+  "view": "Form"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Client Script",
+  "dt": "Sales Invoice",
+  "enabled": 0,
+  "modified": "2025-05-01 16:15:52.137887",
+  "module": "convert In word to Vietnamese",
+  "name": "Convert In word sale invoice",
+  "script": "// Custom Script - Chạy trong trình duyệt\nfrappe.ui.form.on('Sales Invoice', {\n    validate: function(frm) {\n        frappe.call({\n            method: 'my_custom_app.utils.number_to_words_vietnamese',\n            args: {\n                'number': frm.doc.grand_total\n            },\n            callback: function(r) {\n                if (r.message) {\n                    frm.set_value('in_words', r.message);\n                }\n            }\n        });\n    }\n});\n",
+  "view": "Form"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Client Script",
+  "dt": "Purchase Invoice",
+  "enabled": 0,
+  "modified": "2025-05-01 16:15:52.310205",
+  "module": "convert In word to Vietnamese",
+  "name": "Convert inword purchase invocie",
+  "script": "// Custom Script - Chạy trong trình duyệt\nfrappe.ui.form.on('Purchase Invoice', {\n    validate: function(frm) {\n        frappe.call({\n            method: 'my_custom_app.utils.number_to_words_vietnamese',\n            args: {\n                'number': frm.doc.grand_total\n            },\n            callback: function(r) {\n                if (r.message) {\n                    frm.set_value('in_words', r.message);\n                }\n            }\n        });\n    }\n});\n",
+  "view": "Form"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Client Script",
+  "dt": "Salary Slip",
+  "enabled": 0,
+  "modified": "2025-05-01 16:15:52.395307",
+  "module": "convert In word to Vietnamese",
+  "name": "Convert inword salary slip",
+  "script": "// Custom Script - Chạy trong trình duyệt\nfrappe.ui.form.on('Salary Slip', {\n    validate: function(frm) {\n        frappe.call({\n            method: 'my_custom_app.utils.number_to_words_vietnamese',\n            args: {\n                'number': frm.doc.rounded_total\n            },\n            callback: function(r) {\n                if (r.message) {\n                    frm.set_value('total_in_words', r.message);\n                }\n            }\n        });\n    }\n});\n",
+  "view": "Form"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Client Script",
+  "dt": "Expense Claim",
+  "enabled": 1,
+  "modified": "2025-04-08 23:16:39.820636",
+  "module": "convert In word to Vietnamese",
+  "name": "Default acc F5 expense claim",
+  "script": "frappe.ui.form.on('Expense Claim Detail', {\n    expense_type: function(frm) {\n        // Chỉ refresh bảng con 'expenses'\n        frm.refresh_field('expenses');\n    }\n});\n",
+  "view": "Form"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Client Script",
+  "dt": "Expense Claim",
+  "enabled": 1,
+  "modified": "2025-04-08 23:16:39.742866",
+  "module": "convert In word to Vietnamese",
+  "name": "Cost center update expense claim",
+  "script": "frappe.ui.form.on('Expense Claim', {\n    cost_center: function(frm) {\n        // Khi thay đổi cost_center của Expense Claim\n        apply_cost_center_to_expenses(frm);\n    },\n    expenses_add: function(frm, cdt, cdn) {\n        // Khi thêm mới một dòng trong bảng con 'expenses'\n        apply_cost_center_to_expenses(frm);\n    },\n    before_save: function(frm) {\n        // Cập nhật cost_center cho toàn bộ bảng con mỗi khi lưu tài liệu\n        apply_cost_center_to_expenses(frm);\n    }\n});\n\n// Hàm để áp dụng cost_center của Expense Claim lên toàn bộ bảng con\nfunction apply_cost_center_to_expenses(frm) {\n    if (frm.doc.cost_center) {\n        // Nếu cost_center của Expense Claim có giá trị\n        frm.doc.expenses.forEach(function(expense) {\n            expense.cost_center = frm.doc.cost_center;\n        });\n        frm.refresh_field('expenses'); // Cập nhật lại giao diện bảng con\n    }\n    // Nếu không có cost_center ở Expense Claim thì giữ nguyên các giá trị cost_center hiện có của bảng con\n}\n",
+  "view": "Form"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Client Script",
+  "dt": "Petty Expense",
+  "enabled": 1,
+  "modified": "2025-04-08 23:16:39.671450",
+  "module": "convert In word to Vietnamese",
+  "name": "Petty Expense Filter",
+  "script": "frappe.ui.form.on('Petty Expense', {  // Thay 'Your DocType' bằng DocType bạn muốn áp dụng filter\n    refresh: function(frm) {\n        // Lấy đối tượng trường 'expense_account' từ form\n        frm.fields_dict['expense_account'].get_query = function(doc, cdt, cdn) {\n            return {\n                filters: {\n                    // Thêm điều kiện lọc, ví dụ lọc các tài khoản chi tiêu đang hoạt động\n                    'is_group': 0,  // Lọc để chỉ lấy các tài khoản không phải nhóm (ví dụ: là tài khoản chi tiêu)\n                    'root_type': 'Expense'  // Lọc chỉ lấy tài khoản loại 'Expense'\n                }\n            };\n        };\n    },\n\n    mode_of_payment: function(frm) {\n        if (frm.doc.mode_of_payment) {\n            // Truy vấn dữ liệu từ bảng con của mode_of_payment để lấy default_account\n            frappe.call({\n                method: 'frappe.client.get',\n                args: {\n                    doctype: 'Mode of Payment',\n                    name: frm.doc.mode_of_payment\n                },\n                callback: function(r) {\n                    if (r.message) {\n                        var accounts = r.message.accounts || [];\n                        var defaultAccount = null;\n\n                        // Tìm default_account trong bảng con\n                        accounts.forEach(function(account) {\n                            if (account.default_account) {\n                                defaultAccount = account.default_account;\n                            }\n                        });\n\n                        // Cập nhật trường payment_account với giá trị default_account tìm được\n                        if (defaultAccount) {\n                            frm.set_value('payment_account', defaultAccount);\n                        }\n                    }\n                }\n            });\n        }\n    }\n});\n",
+  "view": "Form"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Client Script",
+  "dt": "Project",
+  "enabled": 1,
+  "modified": "2025-04-08 23:16:39.574867",
+  "module": "convert In word to Vietnamese",
+  "name": "total_petty_expense_project",
+  "script": "frappe.ui.form.on('Project', {\n    refresh: function(frm) {\n        // Gọi hàm tính tổng petty expense khi form dự án được tải\n        update_total_petty_expense(frm);\n    }\n});\n\n// Hàm tính tổng petty expense\nfunction update_total_petty_expense(frm) {\n    // Kiểm tra nếu có giá trị cho tên dự án trong trường custom_project\n    if (frm.doc.name) {\n        frappe.call({\n            method: 'frappe.client.get_list',\n            args: {\n                doctype: 'Petty Expense',\n                fields: ['amount'],\n                filters: {\n                    'custom_project': frm.doc.name  // Lọc theo tên dự án\n                }\n            },\n            callback: function(r) {\n                if (r.message) {\n                    // Tính tổng số tiền từ các bản ghi đã lọc\n                    let total_amount = r.message.reduce((sum, petty_expense) => sum + petty_expense.amount, 0);\n                    \n                    // Cập nhật giá trị tổng vào trường custom_total_petty_expense\n                    frm.set_value('custom_total_petty_expense', total_amount);\n                    frm.refresh_field('custom_total_petty_expense');\n                }\n            }\n        });\n    }\n}\n",
+  "view": "Form"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Client Script",
+  "dt": "Attendance",
+  "enabled": 1,
+  "modified": "2025-04-08 23:16:04.898268",
+  "module": "convert In word to Vietnamese",
+  "name": "Project on Attendance",
+  "script": "frappe.listview_settings[\"Attendance\"] = {\n\tadd_fields: [\"status\", \"attendance_date\"],\n\n\tget_indicator: function (doc) {\n\t\tif ([\"Present\", \"Work From Home\"].includes(doc.status)) {\n\t\t\treturn [__(doc.status), \"green\", \"status,=,\" + doc.status];\n\t\t} else if ([\"Absent\", \"On Leave\"].includes(doc.status)) {\n\t\t\treturn [__(doc.status), \"red\", \"status,=,\" + doc.status];\n\t\t} else if (doc.status == \"Half Day\") {\n\t\t\treturn [__(doc.status), \"orange\", \"status,=,\" + doc.status];\n\t\t}\n\t},\n\n\tonload: function (list_view) {\n\t\tlet me = this;\n\n\t\tlist_view.page.add_inner_button(__(\"Mark Attendance\"), function () {\n\t\t\tlet first_day_of_month = moment().startOf(\"month\");\n\n\t\t\tif (moment().toDate().getDate() === 1) {\n\t\t\t\tfirst_day_of_month = first_day_of_month.subtract(1, \"month\");\n\t\t\t}\n\n\t\t\tlet dialog = new frappe.ui.Dialog({\n\t\t\t\ttitle: __(\"Mark Attendance\"),\n\t\t\t\tfields: [\n\t\t\t\t\t{\n\t\t\t\t\t\tfieldname: \"employee\",\n\t\t\t\t\t\tlabel: __(\"For Employee\"),\n\t\t\t\t\t\tfieldtype: \"Link\",\n\t\t\t\t\t\toptions: \"Employee\",\n\t\t\t\t\t\tget_query: () => {\n\t\t\t\t\t\t\treturn {\n\t\t\t\t\t\t\t\tquery: \"erpnext.controllers.queries.employee_query\",\n\t\t\t\t\t\t\t};\n\t\t\t\t\t\t},\n\t\t\t\t\t\treqd: 1,\n\t\t\t\t\t\tonchange: () => me.reset_dialog(dialog),\n\t\t\t\t\t},\n\t\t\t\t\t{\n\t\t\t\t\t\tfieldtype: \"Section Break\",\n\t\t\t\t\t\tfieldname: \"time_period_section\",\n\t\t\t\t\t\thidden: 1,\n\t\t\t\t\t},\n\t\t\t\t\t{\n\t\t\t\t\t\tlabel: __(\"Start\"),\n\t\t\t\t\t\tfieldtype: \"Date\",\n\t\t\t\t\t\tfieldname: \"from_date\",\n\t\t\t\t\t\treqd: 1,\n\t\t\t\t\t\tdefault: first_day_of_month.toDate(),\n\t\t\t\t\t\tonchange: () => me.get_unmarked_days(dialog),\n\t\t\t\t\t},\n\t\t\t\t\t{\n\t\t\t\t\t\tfieldtype: \"Column Break\",\n\t\t\t\t\t\tfieldname: \"time_period_column\",\n\t\t\t\t\t},\n\t\t\t\t\t{\n\t\t\t\t\t\tlabel: __(\"End\"),\n\t\t\t\t\t\tfieldtype: \"Date\",\n\t\t\t\t\t\tfieldname: \"to_date\",\n\t\t\t\t\t\treqd: 1,\n\t\t\t\t\t\tdefault: moment().subtract(1, \"days\").toDate(),\n\t\t\t\t\t\tonchange: () => me.get_unmarked_days(dialog),\n\t\t\t\t\t},\n\t\t\t\t\t{\n\t\t\t\t\t\tfieldtype: \"Section Break\",\n\t\t\t\t\t\tfieldname: \"days_section\",\n\t\t\t\t\t\thidden: 1,\n\t\t\t\t\t},\n\t\t\t\t\t{\n                        fieldname: \"custom_project\",\n                        label: __(\"Project\"),\n                        fieldtype: \"Link\",\n                        options: \"Project\",  // Liên kết với Doctype \"Project\"\n                        reqd: 0,  // Không bắt buộc\n                    },\n\t\t\t\t\t{\n\t\t\t\t\t\tlabel: __(\"Status\"),\n\t\t\t\t\t\tfieldtype: \"Select\",\n\t\t\t\t\t\tfieldname: \"status\",\n\t\t\t\t\t\toptions: [\"Present\", \"Absent\", \"Half Day\", \"Work From Home\"],\n\t\t\t\t\t\treqd: 1,\n\t\t\t\t\t},\n\t\t\t\t\t{\n\t\t\t\t\t\tlabel: __(\"Exclude Holidays\"),\n\t\t\t\t\t\tfieldtype: \"Check\",\n\t\t\t\t\t\tfieldname: \"exclude_holidays\",\n\t\t\t\t\t\tonchange: () => me.get_unmarked_days(dialog),\n\t\t\t\t\t},\n\t\t\t\t\t{\n\t\t\t\t\t\tlabel: __(\"Unmarked Attendance for days\"),\n\t\t\t\t\t\tfieldname: \"unmarked_days\",\n\t\t\t\t\t\tfieldtype: \"MultiCheck\",\n\t\t\t\t\t\toptions: [],\n\t\t\t\t\t\tcolumns: 2,\n\t\t\t\t\t\tselect_all: true,\n\t\t\t\t\t},\n\t\t\t\t],\n\t\t\t\tprimary_action(data) {\n\t\t\t\t\tif (cur_dialog.no_unmarked_days_left) {\n\t\t\t\t\t\tfrappe.msgprint(\n\t\t\t\t\t\t\t__(\n\t\t\t\t\t\t\t\t\"Attendance from {0} to {1} has already been marked for the Employee {2}\",\n\t\t\t\t\t\t\t\t[data.from_date, data.to_date, data.employee],\n\t\t\t\t\t\t\t),\n\t\t\t\t\t\t);\n\t\t\t\t\t} else {\n\t\t\t\t\t\tfrappe.confirm(\n\t\t\t\t\t\t\t__(\"Mark attendance as {0} for {1} on selected dates?\", [\n\t\t\t\t\t\t\t\tdata.status,\n\t\t\t\t\t\t\t\tdata.employee,\n\t\t\t\t\t\t\t]),\n\t\t\t\t\t\t\t() => {\n\t\t\t\t\t\t\t\tfrappe.call({\n\t\t\t\t\t\t\t\t\tmethod: \"hrms.hr.doctype.attendance.attendance.mark_bulk_attendance\",\n\t\t\t\t\t\t\t\t\targs: {\n\t\t\t\t\t\t\t\t\t\tdata: data,\n\t\t\t\t\t\t\t\t\t},\n\t\t\t\t\t\t\t\t\tcallback: function (r) {\n\t\t\t\t\t\t\t\t\t\tif (r.message === 1) {\n\t\t\t\t\t\t\t\t\t\t\tfrappe.show_alert({\n\t\t\t\t\t\t\t\t\t\t\t\tmessage: __(\"Attendance Marked\"),\n\t\t\t\t\t\t\t\t\t\t\t\tindicator: \"blue\",\n\t\t\t\t\t\t\t\t\t\t\t});\n\t\t\t\t\t\t\t\t\t\t\tcur_dialog.hide();\n\t\t\t\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\t\t\t},\n\t\t\t\t\t\t\t\t});\n\t\t\t\t\t\t\t},\n\t\t\t\t\t\t);\n\t\t\t\t\t}\n\t\t\t\t\tdialog.hide();\n\t\t\t\t\tlist_view.refresh();\n\t\t\t\t},\n\t\t\t\tprimary_action_label: __(\"Mark Attendance\"),\n\t\t\t});\n\t\t\tdialog.show();\n\t\t});\n\t},\n\n\treset_dialog: function (dialog) {\n\t\tlet fields = dialog.fields_dict;\n\n\t\tdialog.set_df_property(\"time_period_section\", \"hidden\", fields.employee.value ? 0 : 1);\n\n\t\tdialog.set_df_property(\"days_section\", \"hidden\", 1);\n\t\tdialog.set_df_property(\"unmarked_days\", \"options\", []);\n\t\tdialog.no_unmarked_days_left = false;\n\t\tfields.exclude_holidays.value = false;\n\n\t\tfields.to_date.datepicker.update({\n\t\t\tmaxDate: moment().subtract(1, \"days\").toDate(),\n\t\t});\n\n\t\tthis.get_unmarked_days(dialog);\n\t},\n\n\tget_unmarked_days: function (dialog) {\n\t\tlet fields = dialog.fields_dict;\n\t\tif (fields.employee.value && fields.from_date.value && fields.to_date.value) {\n\t\t\tdialog.set_df_property(\"days_section\", \"hidden\", 0);\n\t\t\tdialog.set_df_property(\"status\", \"hidden\", 0);\n\t\t\tdialog.set_df_property(\"exclude_holidays\", \"hidden\", 0);\n\t\t\tdialog.no_unmarked_days_left = false;\n\n\t\t\tfrappe\n\t\t\t\t.call({\n\t\t\t\t\tmethod: \"hrms.hr.doctype.attendance.attendance.get_unmarked_days\",\n\t\t\t\t\tasync: false,\n\t\t\t\t\targs: {\n\t\t\t\t\t\temployee: fields.employee.value,\n\t\t\t\t\t\tfrom_date: fields.from_date.value,\n\t\t\t\t\t\tto_date: fields.to_date.value,\n\t\t\t\t\t\texclude_holidays: fields.exclude_holidays.value,\n\t\t\t\t\t},\n\t\t\t\t})\n\t\t\t\t.then((r) => {\n\t\t\t\t\tvar options = [];\n\n\t\t\t\t\tfor (var d in r.message) {\n\t\t\t\t\t\tvar momentObj = moment(r.message[d], \"YYYY-MM-DD\");\n\t\t\t\t\t\tvar date = momentObj.format(\"DD-MM-YYYY\");\n\t\t\t\t\t\toptions.push({\n\t\t\t\t\t\t\tlabel: date,\n\t\t\t\t\t\t\tvalue: r.message[d],\n\t\t\t\t\t\t\tchecked: 1,\n\t\t\t\t\t\t});\n\t\t\t\t\t}\n\n\t\t\t\t\tdialog.set_df_property(\n\t\t\t\t\t\t\"unmarked_days\",\n\t\t\t\t\t\t\"options\",\n\t\t\t\t\t\toptions.length > 0 ? options : [],\n\t\t\t\t\t);\n\t\t\t\t\tdialog.no_unmarked_days_left = options.length === 0;\n\t\t\t\t});\n\t\t}\n\t},\n};\n",
+  "view": "List"
+ }
+]
