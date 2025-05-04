@@ -35,15 +35,11 @@
     },
     {
         "fieldname": "month",
-        "label": "Month",
-        "fieldtype": "Select",
-        "reqd": 0
+        "label": "Month"
     },
     {
         "fieldname": "year",
-        "label": "Year",
-        "fieldtype": "Select",
-        "reqd": 0
+        "label": "Year"
     },
     {
         "fieldname": "employee",
@@ -61,8 +57,7 @@
     {
         "fieldname": "group_by",
         "label": "Group By",
-        "fieldtype": "Select",
-        "options": ["", "Branch", "Grade", "Department", "Designation"]
+        "fieldtype": "Select"
     },
     {
         "fieldname": "include_company_descendants",

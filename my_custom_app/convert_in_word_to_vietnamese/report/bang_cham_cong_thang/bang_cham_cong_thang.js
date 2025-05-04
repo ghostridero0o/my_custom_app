@@ -27,9 +27,10 @@ frappe.query_reports["Bang Cham Cong Thang"] = {
 		{
 			fieldname: "year",
 			label: __("Year"),
-			fieldtype: "Select",
+			fieldtype: "Link",
+			options: "Fiscal Year",
 			default: erpnext.utils.get_fiscal_year(frappe.datetime.get_today()),
-			reqd: 0,
+			reqd: 1,
 		},
 		{
 			fieldname: "employee",
@@ -81,18 +82,7 @@ frappe.query_reports["Bang Cham Cong Thang"] = {
 			default: 0,
 		},
 	],
-	onload: function () {
-		return frappe.call({
-			method: "my_custom_app.convert_in_word_to_vietnamese.report.bang_cham_cong_thang.bang_cham_cong_thang.get_attendance_years",
-			callback: function (r) {
-				var year_filter = frappe.query_report.get_filter("year");
-				year_filter.df.options = r.message;
-				year_filter.df.default = r.message.split("\n")[0];
-				year_filter.refresh();
-				year_filter.set_input(year_filter.df.default);
-			},
-		});
-	},
+	
 	formatter: function (value, row, column, data, default_formatter) {
 		value = default_formatter(value, row, column, data);
 		const summarized_view = frappe.query_report.get_filter_value("summarized_view");
