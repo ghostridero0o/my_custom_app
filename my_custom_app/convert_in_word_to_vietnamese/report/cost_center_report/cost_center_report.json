@@ -1,0 +1,34 @@
+{
+    "doctype": "Report",
+    "module": "convert In word to Vietnamese",
+    "name": "Cost Center Report",
+    "is_standard": "Yes",
+    "ref_doctype": "GL Entry",
+    "report_type": "Script Report",
+    "filters": [
+        {
+            "fieldname": "fiscal_year",
+            "label": "Fiscal Year",
+            "fieldtype": "Link",
+            "options": "Fiscal Year"          
+        },
+        {
+            "fieldname": "company",
+            "label": "Company",
+            "fieldtype": "Link",
+            "options": "Company"            
+        },
+        {
+            "fieldname": "cost_center",
+            "label": "Cost Center",
+            "fieldtype": "Link",
+            "options": "Cost Center"
+        },
+        {
+            "fieldname": "project",
+            "label": "Project",
+            "fieldtype": "Link",
+            "options": "Project"            
+        }
+    ]
+}

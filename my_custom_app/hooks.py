@@ -137,24 +137,32 @@ app_license = "mit"
 # ---------------
 # Hook on document methods and events
 
-# doc_events = {
-# 	"*": {
-# 		"on_update": "method",
-# 		"on_cancel": "method",
-# 		"on_trash": "method"
-# 	}
-# }
-
+doc_events = {
+    "Sales Invoice": {
+        "before_save": "my_custom_app.sales_invoice.before_save"
+    },
+    "Purchase Invoice": {
+        "before_save": "my_custom_app.purchase_invoice.before_save"
+    },
+    "Salary Slip": {
+        "before_save": "my_custom_app.salary_slip.before_save"
+    } 
+    # "*": {
+    #     "on_update": "method",
+    #     "on_cancel": "method",
+    #     "on_trash": "method"
+    # }
+}
 # Scheduled Tasks
 # ---------------
 
-# scheduler_events = {
+scheduler_events = {
 # 	"all": [
 # 		"my_custom_app.tasks.all"
 # 	],
-# 	"daily": [
-# 		"my_custom_app.tasks.daily"
-# 	],
+	"daily": [
+		"my_custom_app.scheduler.jobs.update_last_sync_of_checkin"
+	],
 # 	"hourly": [
 # 		"my_custom_app.tasks.hourly"
 # 	],
@@ -164,7 +172,7 @@ app_license = "mit"
 # 	"monthly": [
 # 		"my_custom_app.tasks.monthly"
 # 	],
-# }
+}
 
 # Testing
 # -------
@@ -174,9 +182,12 @@ app_license = "mit"
 # Overriding Methods
 # ------------------------------
 #
-# override_whitelisted_methods = {
-# 	"frappe.desk.doctype.event.event.get_events": "my_custom_app.event.get_events"
-# }
+override_whitelisted_methods = {
+	"erpnext.controllers.item_variant.create_variant": "my_custom_app.controllers.override.custom_create_variant",
+	"erpnext.controllers.item_variant.enqueue_multiple_variant_creation": "my_custom_app.controllers.override.custom_enqueue_multiple_variant_creation",
+    "hrms.hr.doctype.attendance.attendance.mark_bulk_attendance":"my_custom_app.controllers.attendance.mark_bulk_attendance",
+	"hrms.hr.doctype.employee_attendance_tool.employee_attendance_tool.mark_employee_attendance":"my_custom_app.controllers.attendance.mark_employee_attendance"
+}
 #
 # each overriding function accepts a `data` argument;
 # generated from the base implementation of the doctype dashboard,
@@ -184,7 +195,10 @@ app_license = "mit"
 # override_doctype_dashboards = {
 # 	"Task": "my_custom_app.task.get_dashboard_data"
 # }
-
+override_doctype_class = {
+    "Payroll Entry": "my_custom_app.controllers.payroll_entry.CustomPayrollEntry",
+	"Salary Slip": "my_custom_app.controllers.payroll_entry.CustomSalarySlip"
+}
 # exempt linked doctypes from being automatically cancelled
 #
 # auto_cancel_exempted_doctypes = ["Auto Repeat"]
@@ -242,3 +256,15 @@ app_license = "mit"
 # 	"Logging DocType Name": 30  # days to retain logs
 # }
 
+after_install = "my_custom_app.setup.install.after_install"
+
+doctype_js = {
+    "Employee Attendance Tool" : "public/js/my.js"
+    }
+fixtures = [
+	{"dt": "Custom Field", "filters": [["module", "=","convert In word to Vietnamese"]]},
+
+	{"dt": "Property Setter", "filters": [["module", "=","convert In word to Vietnamese"]]},
+
+	{"dt": "DocType", "filters": [["module", "=","convert In word to Vietnamese"]]}
+]

@@ -1,0 +1,28 @@
+{
+    "doctype": "Report",
+    "module": "convert In word to Vietnamese",
+    "name": "Cash Position Report",
+    "is_standard": "Yes",
+    "ref_doctype": "Bank Account",
+    "report_type": "Script Report",
+    "filters": [
+        {
+            "fieldname": "company",
+            "label": "Company",
+            "fieldtype": "Link",
+            "options": "Company"
+        },
+        {
+            "fieldname": "report_date",
+            "label": "Date",
+            "fieldtype": "Date",
+            "reqd": 1
+        },
+        {
+            "fieldname": "currency",
+            "label": "Currency",
+            "fieldtype": "Link",
+            "options": "Currency"
+        }
+    ]
+}
