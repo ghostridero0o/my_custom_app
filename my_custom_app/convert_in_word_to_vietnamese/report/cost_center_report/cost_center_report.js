@@ -2,6 +2,10 @@ frappe.query_reports["Cost Center Report"] = {
     filters: get_filters(),
     formatter: function (value, row, column, data, default_formatter) {
         value = default_formatter(value, row, column, data);
+        // Nếu data chưa có, trả về value luôn (không xử lý thêm)
+        if (!data) {
+            return value;
+        } 
 
         // Đổi màu cho cột balance nếu root_type = 'Income' thì màu đỏ, 'Expense' màu xanh
         if (column.fieldname === "balance") {
