@@ -36,5 +36,24 @@
   "reference_doctype": "Petty Expense",
   "script": "# Chỉ chạy nếu đã có Journal Entry được tạo\nif doc.custom_project:\n    # Lấy document Journal Entry tương ứng\n    jv = frappe.get_doc(\"Journal Entry\", doc.journal_entry)\n\n    # Gán trường project cho từng dòng accounts\n    for row in jv.accounts:\n        row.project = doc.custom_project\n\n    # Lưu lại thay đổi\n    jv.save(ignore_permissions=True)",
   "script_type": "DocType Event"
+ },
+ {
+  "allow_guest": 0,
+  "api_method": null,
+  "cron_format": null,
+  "disabled": 0,
+  "docstatus": 0,
+  "doctype": "Server Script",
+  "doctype_event": "Before Save",
+  "enable_rate_limit": 0,
+  "event_frequency": "All",
+  "modified": "2025-06-15 10:34:15.033574",
+  "module": "convert In word to Vietnamese",
+  "name": "Validate Opening VAT",
+  "rate_limit_count": 5,
+  "rate_limit_seconds": 86400,
+  "reference_doctype": "Hoa Don Ra Vao",
+  "script": "if doc.is_opening == 1 and doc.opening_date:\n    exists = frappe.db.exists(\n        \"Hoa Don Ra Vao\",\n        {\n            \"is_opening\": 1,\n            \"opening_date\": doc.opening_date,\n            \"name\": [\"!=\", doc.name]\n        }\n    )\n    if exists:\n        frappe.throw(f\"Opening VAT đã tồn tại cho ngày: {doc.opening_date}\")\n",
+  "script_type": "DocType Event"
  }
 ]
