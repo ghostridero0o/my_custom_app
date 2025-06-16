@@ -1,0 +1,23 @@
+{
+    "doctype": "Report",
+    "module": "Convert In Word To Vietnamese",
+    "name": "Vat Summary Report",
+    "is_standard": "Yes",
+    "ref_doctype": "Hoa Don Ra Vao",
+    "report_type": "Script Report",
+    "filters": [
+        {
+            "fieldname": "company",
+            "label": "Company",
+            "fieldtype": "Select",
+            "options": "Phu Chau\nPC33",
+            "reqd": 1
+        },
+        {
+            "fieldname": "date",
+            "label": "Date",
+            "fieldtype": "Date",
+            "reqd": 1
+        }
+    ]
+}
