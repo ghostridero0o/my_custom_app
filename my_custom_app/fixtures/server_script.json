@@ -1,6 +1,25 @@
 [
  {
   "allow_guest": 0,
+  "api_method": "get_project_salary_total",
+  "cron_format": null,
+  "disabled": 0,
+  "docstatus": 0,
+  "doctype": "Server Script",
+  "doctype_event": "Before Insert",
+  "enable_rate_limit": 0,
+  "event_frequency": "All",
+  "modified": "2025-06-03 23:47:43.665937",
+  "module": "convert In word to Vietnamese",
+  "name": "get_project_salary_total",
+  "rate_limit_count": 5,
+  "rate_limit_seconds": 86400,
+  "reference_doctype": null,
+  "script": "project_name = frappe.form_dict.get('project_name')\ntotal = 0\ncount = 0\n\n# Lấy danh sách Journal Entry có docstatus = 1 (đã submit)\njournal_entries = frappe.get_all(\"Journal Entry\", filters={\"docstatus\": 1}, fields=[\"name\"])\n\nfor je in journal_entries:\n    doc = frappe.get_doc(\"Journal Entry\", je.name)\n    \n    # Kiểm tra điều kiện: phải có cả 2 loại account\n    has_account_6271 = False\n    has_account_3349 = False\n    \n    # Duyệt qua tất cả rows để kiểm tra điều kiện\n    for row in doc.accounts:\n        if row.account == \"6221 - Chi phí nhân công trực tiếp - PhuChau88\":\n            has_account_6271 = True\n        elif row.account == \"3349 - Bảng lương phải trả - PhuChau88\":\n            has_account_3349 = True\n    \n    # Chỉ xử lý nếu Journal Entry có cả 2 loại account\n    if has_account_6271 and has_account_3349:\n        # Duyệt lại để tính toán cho những rows có project đúng và account = 6271\n        for row in doc.accounts:\n            if row.project == project_name and row.account == \"6221 - Chi phí nhân công trực tiếp - PhuChau88\":\n                debit = float(row.debit or 0)\n                credit = float(row.credit or 0)\n                total = total + debit - credit\n                count = count + 1\nfrappe.response[\"message\"] = {\"total\": total, \"matched_rows\": count}",
+  "script_type": "API"
+ },
+ {
+  "allow_guest": 0,
   "api_method": null,
   "cron_format": null,
   "disabled": 0,
