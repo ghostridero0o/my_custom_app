@@ -27,6 +27,7 @@ def execute(filters=None):
     )
 
     if not opening:
+        # Không có opening record, VAT đầu kỳ = 0
         data.append({
             "invoice_no": "VAT phải nộp đầu kỳ",
             "vat": 0,
@@ -35,41 +36,55 @@ def execute(filters=None):
             "voucher_no": "",
             "indent": 0
         })
-        return columns, data
+        opening_vat = 0
+        # Sử dụng từ đầu đến to_date
+        from_date = None
+    else:
+        opening_doc = opening[0]
+        opening_vat = opening_doc.vat_opening or 0
+        opening_date = opening_doc.opening_date
+        opening_name = opening_doc.name
 
-    opening_doc = opening[0]
-    opening_vat = opening_doc.vat_opening or 0
-    opening_date = opening_doc.opening_date
-    opening_name = opening_doc.name
-
-    data.append({
-        "posting_date": "",
-        "invoice_no": "VAT phải nộp đầu kỳ",
-        "invoice_date": opening_date,
-        "vat": opening_vat,
-        "voucher_no": opening_name,
-        "indent": 0
-    })
+        data.append({
+            "posting_date": "",
+            "invoice_no": "VAT phải nộp đầu kỳ",
+            "invoice_date": opening_date,
+            "vat": opening_vat,
+            "voucher_no": opening_name,
+            "indent": 0
+        })
+        # Sử dụng từ opening_date đến to_date
+        from_date = opening_date
 
     # DÒNG 2: Hóa Đơn Đầu Ra
+    sales_filters = {
+        "docstatus": 1,
+        "company": company,
+        "party": "Customer",
+        "is_opening": 0,
+        "invoice_date": ["<=", to_date]
+    }
+    
+    # Nếu có opening record, lọc từ opening_date
+    if from_date:
+        sales_filters["invoice_date"] = ["between", [from_date, to_date]]
+
     sales = frappe.get_all("Hoa Don Ra Vao",
-        filters={
-            "docstatus": 1,
-            "company": company,
-            "party": "Customer",
-            "is_opening": 0,
-            "invoice_date": ["between", [opening_date, to_date]]
-        },
+        filters=sales_filters,
         fields=[
             "name", "posting_date", "invoice_date", "vat", "tax_rate", "customer_name",
             "invoice_out_no", "total", "grand_total"
         ]
     )
-    sales_total = sum(row.vat or 0 for row in sales)
+    sales_total_vat = sum(row.vat or 0 for row in sales)
+    sales_total_amount = sum(row.total or 0 for row in sales)
+    sales_grand_total = sum(row.grand_total or 0 for row in sales)
 
     data.append({
         "invoice_no": "Hóa Đơn Đầu Ra",
-        "vat": sales_total,
+        "vat": sales_total_vat,
+        "total": sales_total_amount,
+        "grand_total": sales_grand_total,
         "indent": 0,
         "expandable": 1
     })
@@ -89,24 +104,34 @@ def execute(filters=None):
         })
 
     # DÒNG 3: Hóa Đơn Đầu Vào
+    purchase_filters = {
+        "docstatus": 1,
+        "company": company,
+        "party": "Supplier",
+        "is_opening": 0,
+        "invoice_date": ["<=", to_date]
+    }
+    
+    # Nếu có opening record, lọc từ opening_date
+    if from_date:
+        purchase_filters["invoice_date"] = ["between", [from_date, to_date]]
+
     purchases = frappe.get_all("Hoa Don Ra Vao",
-        filters={
-            "docstatus": 1,
-            "company": company,
-            "party": "Supplier",
-            "is_opening": 0,
-            "invoice_date": ["between", [opening_date, to_date]]
-        },
+        filters=purchase_filters,
         fields=[
             "name", "posting_date", "invoice_date", "vat", "tax_rate", "supplier_name",
             "invoice_in_no", "total", "grand_total"
         ]
     )
-    purchase_total = sum(row.vat or 0 for row in purchases)
+    purchase_total_vat = sum(row.vat or 0 for row in purchases)
+    purchase_total_amount = sum(row.total or 0 for row in purchases)
+    purchase_grand_total = sum(row.grand_total or 0 for row in purchases)
 
     data.append({
         "invoice_no": "Hóa Đơn Đầu Vào",
-        "vat": purchase_total,
+        "vat": purchase_total_vat,
+        "total": purchase_total_amount,
+        "grand_total": purchase_grand_total,
         "indent": 0,
         "expandable": 1
     })
@@ -126,7 +151,7 @@ def execute(filters=None):
         })
 
     # DÒNG 4: VAT phải nộp cuối kỳ
-    closing_vat = opening_vat + sales_total - purchase_total
+    closing_vat = opening_vat + sales_total_vat - purchase_total_vat
     data.append({
         "invoice_no": "VAT phải nộp cuối kỳ",
         "vat": closing_vat,
