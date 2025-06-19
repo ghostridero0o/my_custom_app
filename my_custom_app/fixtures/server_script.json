@@ -66,13 +66,13 @@
   "doctype_event": "Before Save",
   "enable_rate_limit": 0,
   "event_frequency": "All",
-  "modified": "2025-06-16 20:24:41.212468",
+  "modified": "2025-06-18 20:35:29.979370",
   "module": "convert In word to Vietnamese",
   "name": "Validate Opening VAT",
   "rate_limit_count": 5,
   "rate_limit_seconds": 86400,
   "reference_doctype": "Hoa Don Ra Vao",
-  "script": "if doc.is_opening == 1 and doc.opening_date:\n    exists = frappe.db.exists(\n        \"Hoa Don Ra Vao\",\n        {\n            \"is_opening\": 1,\n            \"opening_date\": doc.opening_date,\n            \"docstatus\": 1,  # ✅ Chỉ kiểm tra với các bản ghi đã submit\n            \"name\": [\"!=\", doc.name]  # Tránh trùng chính mình (khi update)\n        }\n    )\n    if exists:\n        frappe.throw(f\"Opening VAT đã tồn tại cho ngày: {doc.opening_date}\")\n",
+  "script": "if doc.is_opening == 1 and doc.opening_date:\n    exists = frappe.db.exists(\n        \"Hoa Don Ra Vao\",\n        {\n            \"is_opening\": 1,\n            \"opening_date\": doc.opening_date,\n            \"company\": doc.company,  # ✅ Thêm điều kiện công ty\n            \"docstatus\": 1,\n            \"name\": [\"!=\", doc.name]\n        }\n    )\n    if exists:\n        frappe.throw(f\"Opening VAT đã tồn tại cho ngày {doc.opening_date} cho công ty {doc.company}\")\n",
   "script_type": "DocType Event"
  }
 ]
