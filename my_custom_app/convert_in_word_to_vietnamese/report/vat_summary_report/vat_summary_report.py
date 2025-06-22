@@ -74,7 +74,8 @@ def execute(filters=None):
         fields=[
             "name", "posting_date", "invoice_date", "vat", "tax_rate", "customer_name",
             "invoice_out_no", "total", "grand_total"
-        ]
+        ],
+        order_by="invoice_date desc"  # ✅ Sắp xếp giảm dần theo ngày
     )
     sales_total_vat = sum(row.vat or 0 for row in sales)
     sales_total_amount = sum(row.total or 0 for row in sales)
@@ -121,7 +122,8 @@ def execute(filters=None):
         fields=[
             "name", "posting_date", "invoice_date", "vat", "tax_rate", "supplier_name",
             "invoice_in_no", "total", "grand_total"
-        ]
+        ],
+        order_by="invoice_date desc"  # ✅ Sắp xếp giảm dần theo ngày
     )
     purchase_total_vat = sum(row.vat or 0 for row in purchases)
     purchase_total_amount = sum(row.total or 0 for row in purchases)
