@@ -158,10 +158,10 @@
   "doctype": "Client Script",
   "dt": "BOM",
   "enabled": 1,
-  "modified": "2025-05-06 23:15:36.752518",
+  "modified": "2025-06-23 18:38:07.684947",
   "module": "convert In word to Vietnamese",
   "name": "Cost Per Unit",
-  "script": "frappe.ui.form.on('BOM', {\n    refresh: function(frm) {\n        calculate_cost_per_unit(frm);\n    },\n    total_cost: function(frm) {\n        calculate_cost_per_unit(frm);\n    },\n    quantity: function(frm) {\n        calculate_cost_per_unit(frm);\n    }\n});\n\nfunction calculate_cost_per_unit(frm) {\n    const total_cost = frm.doc.total_cost || 0;\n    const quantity = frm.doc.quantity || 0;\n\n    if (quantity !== 0) {\n        frm.set_value('custom_cost_per_unit', total_cost / quantity);\n    } else {\n        frm.set_value('custom_cost_per_unit', 0);\n    }\n}\n",
+  "script": "frappe.ui.form.on('BOM', {\n    before_save: function(frm) {\n        calculate_cost_per_unit(frm);\n    },\n    total_cost: function(frm) {\n        calculate_cost_per_unit(frm);\n    },\n    quantity: function(frm) {\n        calculate_cost_per_unit(frm);\n    }\n});\n\nfunction calculate_cost_per_unit(frm) {\n    const total_cost = frm.doc.total_cost || 0;\n    const quantity = frm.doc.quantity || 0;\n\n    if (quantity !== 0) {\n        frm.set_value('custom_cost_per_unit', total_cost / quantity);\n    } else {\n        frm.set_value('custom_cost_per_unit', 0);\n    }\n}\n",
   "view": "Form"
  },
  {
