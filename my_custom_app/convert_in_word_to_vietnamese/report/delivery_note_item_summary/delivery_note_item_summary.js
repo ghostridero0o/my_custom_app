@@ -5,6 +5,7 @@ frappe.query_reports["Delivery Note Item Summary"] = {
         label: "Company",
         fieldtype: "Link",
         options: "Company",
+        default: frappe.defaults.get_default("company"),
         reqd: 1
       },
       {
