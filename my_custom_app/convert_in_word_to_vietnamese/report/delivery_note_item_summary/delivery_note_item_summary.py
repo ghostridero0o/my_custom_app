@@ -14,6 +14,7 @@ def get_data_by_item(filters):
     columns = [
         {"label": "Item Code", "fieldname": "item_code", "fieldtype": "Link", "options": "Item", "width": 150},
         {"label": "Item Name", "fieldname": "item_name", "fieldtype": "Data", "width": 200},
+        {"label": "Total Qty", "fieldname": "total_qty", "fieldtype": "Float", "width": 120},
         {"label": "Rate", "fieldname": "rate", "fieldtype": "Currency", "width": 100},
         {"label": "Total Amount", "fieldname": "total_amount", "fieldtype": "Currency", "width": 150},        
         
