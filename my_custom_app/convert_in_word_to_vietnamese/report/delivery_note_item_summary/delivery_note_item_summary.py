@@ -26,7 +26,7 @@ def get_data_by_item(filters):
     if filters.get("customer"):
         conditions += " AND dn.customer = %(customer)s"
     if filters.get("project"):
-        conditions += " AND dni.project = %(project)s"
+        conditions += " AND dn.project = %(project)s"
 
     data = frappe.db.sql(f"""
         SELECT
@@ -52,7 +52,7 @@ def get_data_by_delivery_date(filters):
     if filters.get("customer"):
         conditions += " AND dn.customer = %(customer)s"
     if filters.get("project"):
-        conditions += " AND dni.project = %(project)s"
+        conditions += " AND dn.project = %(project)s"
 
     date_list = frappe.db.sql(f"""
         SELECT DISTINCT dn.posting_date
@@ -106,7 +106,7 @@ def get_data_by_delivery_note(filters):
     if filters.get("customer"):
         conditions += " AND dn.customer = %(customer)s"
     if filters.get("project"):
-        conditions += " AND dni.project = %(project)s"
+        conditions += " AND dn.project = %(project)s"
 
     # Lấy danh sách Delivery Note theo thứ tự mới nhất
     dn_list = frappe.db.sql(f"""
