@@ -259,7 +259,9 @@ override_doctype_class = {
 after_install = "my_custom_app.setup.install.after_install"
 
 doctype_js = {
-    "Employee Attendance Tool" : "public/js/my.js"
+    "Employee Attendance Tool" : "public/js/my.js",
+    "Employee Incentive": "public/js/employee_incentive.js",
+    "Additional Salary": "public/js/additional_salary.js"
     }
 fixtures = [
 	{"dt": "Custom Field", "filters": [["module", "=","convert In word to Vietnamese"]]},
