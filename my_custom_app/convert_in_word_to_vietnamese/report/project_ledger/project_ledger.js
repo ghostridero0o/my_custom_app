@@ -8,7 +8,8 @@ frappe.query_reports["Project Ledger"] = {
             value?.includes("Doanh thu") || 
             value?.includes("Chi phí") || 
             value?.includes("Net Cash Flow") || 
-            value?.includes("Lợi nhuận")
+            value?.includes("Lợi nhuận") ||
+            value?.includes("Nhân công trực tiếp") // 👈 thêm dòng này
         )) {
             return default_formatter(value, row, column, data)
                 .replace(/&lt;b&gt;/g, "<b>")

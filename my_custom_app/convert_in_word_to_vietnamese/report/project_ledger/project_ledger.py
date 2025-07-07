@@ -1,6 +1,7 @@
 import frappe
 from frappe.utils import flt
 
+
 def execute(filters=None):
     filters = frappe._dict(filters or {})
     columns = get_columns()
@@ -30,14 +31,12 @@ def get_columns():
 
 
 def get_common_filters(filters):
-    """Tạo filter chung, bỏ qua các giá trị None hoặc rỗng"""
     common_filters = {
         "posting_date": ["between", [filters.from_date, filters.to_date]],
         "company": filters.company,
-        "is_cancelled": 0,  # Chỉ lấy các bản ghi chưa bị hủy
+        "is_cancelled": 0
     }
-    
-    # Chỉ thêm filter nếu có giá trị
+
     if filters.get("finance_book"):
         common_filters["finance_book"] = filters.finance_book
     if filters.get("project"):
@@ -48,7 +47,7 @@ def get_common_filters(filters):
         common_filters["voucher_type"] = filters.voucher_type
     if filters.get("voucher_subtype"):
         common_filters["voucher_subtype"] = filters.voucher_subtype
-    
+
     return common_filters
 
 
@@ -71,7 +70,6 @@ def get_cash_flow_data(filters):
 
     cash_in, cash_out = [], []
     for e in entries:
-        # Khởi tạo row cơ bản
         row = {
             "posting_date": e.posting_date,
             "account": e.account,
@@ -84,12 +82,10 @@ def get_cash_flow_data(filters):
             "party": e.party or "",
         }
 
-        # Xử lý debit (tiền vào)
         if flt(e.debit) > 0:
             row["amount"] = flt(e.debit)
             cash_in.append(row.copy())
-        
-        # Xử lý credit (tiền ra)
+
         if flt(e.credit) > 0:
             row["amount"] = flt(e.credit)
             cash_out.append(row.copy())
@@ -97,20 +93,60 @@ def get_cash_flow_data(filters):
     total_in = sum(r["amount"] for r in cash_in)
     total_out = sum(r["amount"] for r in cash_out)
 
+    # Nhân công trực tiếp (account_number = 6221 và against chứa 3349)
+    nhan_cong = []
+    total_nhan_cong = 0
+    nc_account = frappe.db.get_value("Account", {"account_number": "6221"}, "name")
+
+    if nc_account:
+        nc_filters = get_common_filters(filters)
+        nc_filters["account"] = nc_account
+        nc_filters["against"] = ["like", "%3349%"]
+
+        nc_entries = frappe.get_all("GL Entry",
+            filters=nc_filters,
+            fields=[
+                "posting_date", "account", "remarks", "voucher_type", "voucher_subtype",
+                "voucher_no", "against", "party_type", "party", "debit", "credit"
+            ],
+            order_by="posting_date asc"
+        )
+
+        for e in nc_entries:
+            amount = flt(e.debit) - flt(e.credit)
+            if amount != 0:
+                row = {
+                    "posting_date": e.posting_date,
+                    "account": e.account,
+                    "remarks": e.remarks or "",
+                    "voucher_type": e.voucher_type,
+                    "voucher_subtype": e.voucher_subtype or "",
+                    "voucher_no": e.voucher_no,
+                    "against": e.against or "",
+                    "party_type": e.party_type or "",
+                    "party": e.party or "",
+                    "amount": amount
+                }
+                nhan_cong.append(row)
+                total_nhan_cong += amount
+
+    # Assemble result
     data = []
-    
-    # Thêm header và dữ liệu Cash In
+
     if cash_in:
         data.append({"account": "<b>Cash In</b>", "amount": total_in, "remarks": "Total"})
         data.extend(cash_in)
-    
-    # Thêm header và dữ liệu Cash Out
+
     if cash_out:
         data.append({"account": "<b>Cash Out</b>", "amount": total_out, "remarks": "Total"})
         data.extend(cash_out)
-    
-    # Thêm tổng kết
-    data.append({"account": "<b>Net Cash Flow</b>", "amount": total_in - total_out, "remarks": "Cash In - Cash Out"})
+
+    if nhan_cong:
+        data.append({"account": "<b>Nhân công trực tiếp</b>", "amount": total_nhan_cong, "remarks": "Tài khoản 6221 / 3349"})
+        data.extend(nhan_cong)
+
+    net_cash = total_in - total_out - total_nhan_cong
+    data.append({"account": "<b>Net Cash Flow</b>", "amount": net_cash, "remarks": "Cash In - Cash Out - Nhân công"})
 
     return data
 
@@ -138,16 +174,14 @@ def get_profit_and_loss_data(filters):
     income, expense = [], []
     for e in entries:
         root_type = account_map.get(e.account)
-        
-        # Tính amount theo logic kế toán
+
         if root_type == "Income":
             amount = flt(e.credit) - flt(e.debit)
         elif root_type == "Expense":
             amount = flt(e.debit) - flt(e.credit)
         else:
-            continue  # Bỏ qua nếu không phải Income hoặc Expense
-        
-        # Chỉ thêm vào nếu có amount
+            continue
+
         if amount != 0:
             row = {
                 "posting_date": e.posting_date,
@@ -171,18 +205,15 @@ def get_profit_and_loss_data(filters):
     total_expense = sum(r["amount"] for r in expense)
 
     data = []
-    
-    # Thêm header và dữ liệu Income
+
     if income:
         data.append({"account": "<b>Doanh thu</b>", "amount": total_income, "remarks": "Total"})
         data.extend(income)
-    
-    # Thêm header và dữ liệu Expense
+
     if expense:
         data.append({"account": "<b>Chi phí</b>", "amount": total_expense, "remarks": "Total"})
         data.extend(expense)
-    
-    # Thêm tổng kết
+
     data.append({"account": "<b>Lợi nhuận/Lỗ</b>", "amount": total_income - total_expense, "remarks": "Doanh thu - Chi phí"})
 
     return data
