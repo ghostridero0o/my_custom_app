@@ -57,7 +57,8 @@ function get_filters() {
             fieldname: "project",
             label: "Project",
             fieldtype: "Link",
-            options: "Project"
+            options: "Project",
+            reqd: 1
         },
         {
             fieldname: "cost_center",
