@@ -1,6 +1,22 @@
 [
  {
   "default_value": null,
+  "doc_type": "Purchase Receipt Item",
+  "docstatus": 0,
+  "doctype": "Property Setter",
+  "doctype_or_field": "DocField",
+  "field_name": "project",
+  "is_system_generated": 0,
+  "modified": "2025-07-09 00:57:36.424909",
+  "module": "convert In word to Vietnamese",
+  "name": "Purchase Receipt Item-project-allow_on_submit",
+  "property": "allow_on_submit",
+  "property_type": "check",
+  "row_name": null,
+  "value": "1"
+ },
+ {
+  "default_value": null,
   "doc_type": "Sales Order",
   "docstatus": 0,
   "doctype": "Property Setter",
@@ -460,6 +476,38 @@
   "name": "Payroll Entry-branch-in_list_view",
   "property": "in_list_view",
   "property_type": "Check",
+  "row_name": null,
+  "value": "1"
+ },
+ {
+  "default_value": null,
+  "doc_type": "Stock Ledger Entry",
+  "docstatus": 0,
+  "doctype": "Property Setter",
+  "doctype_or_field": "DocField",
+  "field_name": "project",
+  "is_system_generated": 0,
+  "modified": "2025-07-09 01:05:26.082316",
+  "module": "convert In word to Vietnamese",
+  "name": "Stock Ledger Entry-project-allow_on_submit",
+  "property": "allow_on_submit",
+  "property_type": "check",
+  "row_name": null,
+  "value": "1"
+ },
+ {
+  "default_value": null,
+  "doc_type": "Hoa Don Ra Vao",
+  "docstatus": 0,
+  "doctype": "Property Setter",
+  "doctype_or_field": "DocField",
+  "field_name": "posting_date",
+  "is_system_generated": 0,
+  "modified": "2025-07-09 22:20:11.277096",
+  "module": "convert In word to Vietnamese",
+  "name": "Hoa Don Ra Vao-posting_date-allow_on_submit",
+  "property": "allow_on_submit",
+  "property_type": "check",
   "row_name": null,
   "value": "1"
  }
