@@ -186,7 +186,8 @@ override_whitelisted_methods = {
 	"erpnext.controllers.item_variant.create_variant": "my_custom_app.controllers.override.custom_create_variant",
 	"erpnext.controllers.item_variant.enqueue_multiple_variant_creation": "my_custom_app.controllers.override.custom_enqueue_multiple_variant_creation",
     "hrms.hr.doctype.attendance.attendance.mark_bulk_attendance":"my_custom_app.controllers.attendance.mark_bulk_attendance",
-	"hrms.hr.doctype.employee_attendance_tool.employee_attendance_tool.mark_employee_attendance":"my_custom_app.controllers.attendance.mark_employee_attendance"
+	"hrms.hr.doctype.employee_attendance_tool.employee_attendance_tool.mark_employee_attendance":"my_custom_app.controllers.attendance.mark_employee_attendance",
+    "erpnext.accounts.utils.get_children": "my_custom_app.controllers.utils.get_children"
 }
 #
 # each overriding function accepts a `data` argument;
