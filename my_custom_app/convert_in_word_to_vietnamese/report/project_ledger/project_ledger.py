@@ -85,7 +85,7 @@ def get_cash_flow_data(filters):
         if flt(e.debit) > 0:
             row["amount"] = flt(e.debit)
             cash_in.append(row.copy())
-
+            
         if flt(e.credit) > 0:
             row["amount"] = flt(e.credit)
             cash_out.append(row.copy())
@@ -93,7 +93,43 @@ def get_cash_flow_data(filters):
     total_in = sum(r["amount"] for r in cash_in)
     total_out = sum(r["amount"] for r in cash_out)
 
-    # Nhân công trực tiếp (account_number = 6221 và against chứa 3349)
+    # ==== Các khoản giải ngân (3411, 3412) ====
+    disburse_accounts = frappe.get_all("Account", filters={"account_number": ["in", ["3411", "3412"]]}, pluck="name")
+    disburse = []
+    total_disburse = 0
+
+    if disburse_accounts:
+        disburse_filters = get_common_filters(filters)
+        disburse_filters["account"] = ["in", disburse_accounts]
+
+        disburse_entries = frappe.get_all("GL Entry",
+            filters=disburse_filters,
+            fields=[
+                "posting_date", "account", "remarks", "voucher_type", "voucher_subtype",
+                "voucher_no", "against", "party_type", "party", "debit", "credit"
+            ],
+            order_by="posting_date asc"
+        )
+
+        for e in disburse_entries:
+            amount = flt(e.credit) - flt(e.debit)
+            if amount != 0:
+                row = {
+                    "posting_date": e.posting_date,
+                    "account": e.account,
+                    "remarks": e.remarks or "",
+                    "voucher_type": e.voucher_type,
+                    "voucher_subtype": e.voucher_subtype or "",
+                    "voucher_no": e.voucher_no,
+                    "against": e.against or "",
+                    "party_type": e.party_type or "",
+                    "party": e.party or "",
+                    "amount": amount
+                }
+                disburse.append(row)
+                total_disburse += amount
+
+    # ==== Nhân công trực tiếp (6221, against chứa 3349) ====
     nhan_cong = []
     total_nhan_cong = 0
     nc_account = frappe.db.get_value("Account", {"account_number": "6221"}, "name")
@@ -130,7 +166,7 @@ def get_cash_flow_data(filters):
                 nhan_cong.append(row)
                 total_nhan_cong += amount
 
-    # Assemble result
+    # ==== Assemble final report ====
     data = []
 
     if cash_in:
@@ -141,14 +177,19 @@ def get_cash_flow_data(filters):
         data.append({"account": "<b>Cash Out</b>", "amount": total_out, "remarks": "Total"})
         data.extend(cash_out)
 
+    if disburse:
+        data.append({"account": "<b>Các khoản giải ngân để thanh toán</b>", "amount": total_disburse, "remarks": "Tài khoản 3411/3412"})
+        data.extend(disburse)
+
     if nhan_cong:
         data.append({"account": "<b>Nhân công trực tiếp</b>", "amount": total_nhan_cong, "remarks": "Tài khoản 6221 / 3349"})
         data.extend(nhan_cong)
 
-    net_cash = total_in - total_out - total_nhan_cong
+    net_cash = total_in - total_out - total_disburse - total_nhan_cong
     data.append({"account": "<b>Net Cash Flow</b>", "amount": net_cash, "remarks": "Cash In - Cash Out - Nhân công"})
 
     return data
+
 
 
 def get_profit_and_loss_data(filters):
