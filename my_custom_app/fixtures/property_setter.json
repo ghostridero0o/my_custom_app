@@ -1,6 +1,38 @@
 [
  {
   "default_value": null,
+  "doc_type": "Purchase Invoice",
+  "docstatus": 0,
+  "doctype": "Property Setter",
+  "doctype_or_field": "DocField",
+  "field_name": "write_off_amount",
+  "is_system_generated": 0,
+  "modified": "2025-07-14 11:22:53.197708",
+  "module": "convert In word to Vietnamese",
+  "name": "Purchase Invoice-posting_date-allow_on_submit",
+  "property": "allow_on_submit",
+  "property_type": "check",
+  "row_name": "",
+  "value": "1"
+ },
+ {
+  "default_value": null,
+  "doc_type": "Purchase Invoice",
+  "docstatus": 0,
+  "doctype": "Property Setter",
+  "doctype_or_field": "DocField",
+  "field_name": "base_write_off_amount",
+  "is_system_generated": 0,
+  "modified": "2025-07-14 11:23:02.210768",
+  "module": "convert In word to Vietnamese",
+  "name": "Purchase Invoice-base_write_off_amount-allow_on_submit",
+  "property": "allow_on_submit",
+  "property_type": "check",
+  "row_name": "",
+  "value": "1"
+ },
+ {
+  "default_value": null,
   "doc_type": "Purchase Receipt Item",
   "docstatus": 0,
   "doctype": "Property Setter",
