@@ -160,9 +160,9 @@ scheduler_events = {
 # 	"all": [
 # 		"my_custom_app.tasks.all"
 # 	],
-	"daily": [
-		"my_custom_app.scheduler.jobs.update_last_sync_of_checkin"
-	],
+#	"daily": [
+#		"my_custom_app.scheduler.jobs.update_last_sync_of_checkin"
+#	],
     "cron": {
         "0 8 * * *": [  # phút 0, giờ 8 sáng mỗi ngày
             "my_custom_app.scheduler.reminders.send_attendance_list"
