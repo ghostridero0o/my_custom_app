@@ -46,8 +46,12 @@ def create_paid_entry(**kwargs):
 
         set_party_account("Payment Entry", None, doc, party_type)
 
+         # Set Paid To
+        set_party_account("Payment Entry", None, doc, party_type)
         if not doc.paid_to:
-            doc.paid_to = "3311 - Nợ phải trả dài hạn - PhuChau88"
+            doc.paid_to = frappe.db.get_value("Company", company, "default_payable_account")
+            if not doc.paid_to:
+                frappe.throw(f"Company {company} không có Default Payable Account được cấu hình.")
             doc.paid_to_account_currency = frappe.db.get_value("Account", doc.paid_to, "account_currency")
 
         doc.update(get_party_details(
