@@ -58,6 +58,7 @@ def get_cash_flow_data(filters):
 
     common_filters = get_common_filters(filters)
     common_filters["account"] = ["in", accounts]
+    common_filters["voucher_subtype"] = ["!=", "Internal Transfer"]
 
     entries = frappe.get_all("GL Entry",
         filters=common_filters,
