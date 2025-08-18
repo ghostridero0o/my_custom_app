@@ -295,5 +295,27 @@
   "name": "Update project DN",
   "script": "frappe.ui.form.on('Delivery Note', {\n    project: function(frm) {\n        const project = frm.doc.project;\n\n        // Nếu có giá trị project ở form chính -> update tất cả row con\n        if (project) {\n            frm.doc.items.forEach(item => {\n                item.project = project;\n            });\n            frm.refresh_field('items');\n        }\n    },\n\n    // Khi load hoặc khi items thay đổi, kiểm tra để set project nếu form đã có sẵn\n    refresh: function(frm) {\n        frm.trigger('apply_project_to_items');\n    },\n\n    items_on_form_rendered: function(frm) {\n        frm.trigger('apply_project_to_items');\n    },\n\n    apply_project_to_items: function(frm) {\n        const project = frm.doc.project;\n        if (project) {\n            frm.doc.items.forEach(item => {\n                item.project = project;\n            });\n            frm.refresh_field('items');\n        }\n    },\n\n    validate: function(frm) {\n        // Nếu không có project ở form chính thì không ép gì cả, giữ nguyên dòng con\n        if (!frm.doc.project) {\n            // Không làm gì\n        }\n    }\n});\n\nfrappe.ui.form.on('Delivery Note Item', {\n    project: function(frm, cdt, cdn) {\n        // Nếu project cha có giá trị thì không cho chỉnh từng dòng\n        const row = locals[cdt][cdn];\n        if (frm.doc.project) {\n            frappe.model.set_value(cdt, cdn, 'project', frm.doc.project);\n            \n        }\n    }\n});\n",
   "view": "Form"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Client Script",
+  "dt": "Purchase Invoice",
+  "enabled": 1,
+  "modified": "2025-08-17 23:27:48.284557",
+  "module": "convert In word to Vietnamese",
+  "name": "Update remarks PI",
+  "script": "frappe.ui.form.on('Purchase Invoice', {\n    onload: function(frm) {\n        if (frm.doc.supplier_name) {\n            frm.set_value('remarks', `Mua hàng từ ${frm.doc.supplier_name}`);\n        }\n    },\n    supplier: function(frm) {\n        if (frm.doc.supplier_name) {\n            frm.set_value('remarks', `Mua hàng từ ${frm.doc.supplier_name}`);\n        }\n    }\n});\n",
+  "view": "Form"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Client Script",
+  "dt": "Payment Entry",
+  "enabled": 1,
+  "modified": "2025-08-18 00:06:17.280401",
+  "module": "convert In word to Vietnamese",
+  "name": "Set remarks PE",
+  "script": "function set_custom_remarks(frm) {\n    if (frm.doc.custom_remarks) {\n        let txt = \"\";\n        let amount = 0;\n        let currency = \"\";\n\n        if (frm.doc.payment_type === \"Internal Transfer\") {\n            amount = frm.doc.paid_amount || 0;\n            currency = frm.doc.paid_from_account_currency || \"\";\n            txt = `Internal Transfer ${amount} ${currency} from ${frm.doc.paid_from || \"\"} to ${frm.doc.paid_to || \"\"}`;\n        } \n        else if (frm.doc.payment_type === \"Pay\") {\n            amount = frm.doc.paid_amount || 0;\n            currency = frm.doc.paid_from_account_currency || \"\";\n            txt = `Paid ${amount} ${currency} from ${frm.doc.paid_from || \"\"} to ${frm.doc.party_name || \"\"}`;\n        } \n        else if (frm.doc.payment_type === \"Receive\") {\n            amount = frm.doc.received_amount || 0;\n            currency = frm.doc.party_account_currency || \"\";\n            txt = `Received ${amount} ${currency} from ${frm.doc.party_name || \"\"} to ${frm.doc.paid_to || \"\"}`;\n        }\n\n        if (txt) {\n            frm.set_value(\"remarks\", txt);\n        }\n    }\n}\n\nfrappe.ui.form.on(\"Payment Entry\", {\n    custom_remarks(frm) {\n        set_custom_remarks(frm);\n    },\n    payment_type(frm) {\n        set_custom_remarks(frm);\n    },\n    paid_from(frm) {\n        set_custom_remarks(frm);\n    },\n    paid_to(frm) {\n        set_custom_remarks(frm);\n    },\n    party_name(frm) {\n        set_custom_remarks(frm);\n    },\n    paid_amount(frm) {\n        set_custom_remarks(frm);\n    },\n    received_amount(frm) {\n        set_custom_remarks(frm);\n    }\n});\n",
+  "view": "Form"
  }
 ]
