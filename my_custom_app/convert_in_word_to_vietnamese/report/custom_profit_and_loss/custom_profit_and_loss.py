@@ -303,18 +303,21 @@ def get_columns(years, currency, show_ratio=False):
             })
     return columns
 def get_chart_data(filters, columns, data, currency):
-    # Lấy nhãn từ cột (bắt đầu từ năm đầu tiên)
-    labels = [c.get("label") for c in columns if c.get("fieldtype") in ("Currency", "Percent") and not c.get("label").startswith("Tỷ trọng")]
+    # Lấy nhãn từ cột (bắt đầu từ năm đầu tiên, bỏ cột tỷ trọng)
+    labels = [
+        c.get("label") for c in columns
+        if c.get("fieldtype") in ("Currency", "Percent")
+        and not c.get("label").startswith("Tỷ trọng")
+    ]
 
-    # Chỉ số các dòng cần vẽ
-    # r01: Doanh thu bán hàng và cung cấp dịch vụ
-    # r11: Giá vốn hàng bán
-    # r50: Lợi nhuận kế toán trước thuế
-    revenue = next((d for d in data if d.get("code") == "01"), None)
-    cogs = next((d for d in data if d.get("code") == "11"), None)
-    profit = next((d for d in data if d.get("code") == "50"), None)
+    # Các dòng cần vẽ
+    revenue = next((d for d in data if d.get("code") == "01"), None)   # Doanh thu bán hàng
+    cogs = next((d for d in data if d.get("code") == "11"), None)      # Giá vốn
+    gross_profit = next((d for d in data if d.get("code") == "20"), None)  # Lợi nhuận gộp
+    profit = next((d for d in data if d.get("code") == "50"), None)    # Lợi nhuận trước thuế
 
-    revenue_data, cogs_data, profit_data = [], [], []
+    revenue_data, cogs_data, gross_profit_data, profit_data = [], [], [], []
+
     for c in columns:
         fn = c.get("fieldname")
         if fn and fn.startswith("y"):
@@ -322,6 +325,8 @@ def get_chart_data(filters, columns, data, currency):
                 revenue_data.append(revenue.get(fn))
             if cogs:
                 cogs_data.append(cogs.get(fn))
+            if gross_profit:
+                gross_profit_data.append(gross_profit.get(fn))
             if profit:
                 profit_data.append(profit.get(fn))
 
@@ -330,8 +335,10 @@ def get_chart_data(filters, columns, data, currency):
         datasets.append({"name": _("Doanh thu"), "values": revenue_data})
     if cogs_data:
         datasets.append({"name": _("Giá vốn"), "values": cogs_data})
+    if gross_profit_data:
+        datasets.append({"name": _("Lợi nhuận gộp"), "values": gross_profit_data})
     if profit_data:
-        datasets.append({"name": _("Lợi nhuận"), "values": profit_data})
+        datasets.append({"name": _("Lợi nhuận trước thuế"), "values": profit_data})
 
     chart = {"data": {"labels": labels, "datasets": datasets}, "type": "bar"}
     chart["fieldtype"] = "Currency"
