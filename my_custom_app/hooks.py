@@ -204,6 +204,7 @@ override_whitelisted_methods = {
 override_doctype_class = {
     "Payroll Entry": "my_custom_app.controllers.payroll_entry.CustomPayrollEntry",
 	"Salary Slip": "my_custom_app.controllers.payroll_entry.CustomSalarySlip",
+    "Petty Expense": "my_custom_app.controllers.petty_expense.CustomPettyExpense",
     "Shift Type": "my_custom_app.controllers.shift_type.CustomShiftType"
 }
 # exempt linked doctypes from being automatically cancelled
