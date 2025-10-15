@@ -317,5 +317,16 @@
   "name": "Set remarks PE",
   "script": "function set_custom_remarks(frm) {\n    if (frm.doc.custom_remarks) {\n        let txt = \"\";\n        let amount = 0;\n        let currency = \"\";\n\n        if (frm.doc.payment_type === \"Internal Transfer\") {\n            amount = frm.doc.paid_amount || 0;\n            currency = frm.doc.paid_from_account_currency || \"\";\n            txt = `Internal Transfer ${amount} ${currency} from ${frm.doc.paid_from || \"\"} to ${frm.doc.paid_to || \"\"}`;\n        } \n        else if (frm.doc.payment_type === \"Pay\") {\n            amount = frm.doc.paid_amount || 0;\n            currency = frm.doc.paid_from_account_currency || \"\";\n            txt = `Paid ${amount} ${currency} from ${frm.doc.paid_from || \"\"} to ${frm.doc.party_name || \"\"}`;\n        } \n        else if (frm.doc.payment_type === \"Receive\") {\n            amount = frm.doc.received_amount || 0;\n            currency = frm.doc.party_account_currency || \"\";\n            txt = `Received ${amount} ${currency} from ${frm.doc.party_name || \"\"} to ${frm.doc.paid_to || \"\"}`;\n        }\n\n        if (txt) {\n            frm.set_value(\"remarks\", txt);\n        }\n    }\n}\n\nfrappe.ui.form.on(\"Payment Entry\", {\n    custom_remarks(frm) {\n        set_custom_remarks(frm);\n    },\n    payment_type(frm) {\n        set_custom_remarks(frm);\n    },\n    paid_from(frm) {\n        set_custom_remarks(frm);\n    },\n    paid_to(frm) {\n        set_custom_remarks(frm);\n    },\n    party_name(frm) {\n        set_custom_remarks(frm);\n    },\n    paid_amount(frm) {\n        set_custom_remarks(frm);\n    },\n    received_amount(frm) {\n        set_custom_remarks(frm);\n    }\n});\n",
   "view": "Form"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Client Script",
+  "dt": "Task",
+  "enabled": 1,
+  "modified": "2025-10-15 19:04:47.568604",
+  "module": "convert In word to Vietnamese",
+  "name": "Task Kanban View",
+  "script": "frappe.listview_settings['Task'].onload = function(listview) {\n    window.location.href = \"/app/task/view/kanban/Dự án 1\";\n};",
+  "view": "List"
  }
 ]
