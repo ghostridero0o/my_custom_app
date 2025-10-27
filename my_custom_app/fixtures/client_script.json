@@ -328,5 +328,16 @@
   "name": "Task Kanban View",
   "script": "frappe.listview_settings['Task'].onload = function(listview) {\n    window.location.href = \"/app/task/view/kanban/Dự án 1\";\n};",
   "view": "List"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Client Script",
+  "dt": "Sales Invoice",
+  "enabled": 1,
+  "modified": "2025-10-25 22:13:37.055878",
+  "module": "convert In word to Vietnamese",
+  "name": "Update remarks SI",
+  "script": "frappe.ui.form.on('Sales Invoice', {\n    onload: function(frm) {\n        if (frm.doc.customer_name) {\n            frm.set_value('remarks', `Bán hàng cho ${frm.doc.customer_name}`);\n        }\n    },\n    customer: function(frm) {\n        if (frm.doc.customer_name) {\n            frm.set_value('remarks', `Bán hàng cho ${frm.doc.customer_name}`);\n        }\n    }\n});\n",
+  "view": "Form"
  }
 ]

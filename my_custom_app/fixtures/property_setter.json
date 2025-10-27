@@ -165,22 +165,6 @@
   "docstatus": 0,
   "doctype": "Property Setter",
   "doctype_or_field": "DocField",
-  "field_name": "journal_entry",
-  "is_system_generated": 0,
-  "modified": "2025-05-02 21:01:00.364809",
-  "module": "convert In word to Vietnamese",
-  "name": "Petty Expense-journal_entry-permlevel",
-  "property": "permlevel",
-  "property_type": "Int",
-  "row_name": null,
-  "value": "1"
- },
- {
-  "default_value": null,
-  "doc_type": "Petty Expense",
-  "docstatus": 0,
-  "doctype": "Property Setter",
-  "doctype_or_field": "DocField",
   "field_name": "payment_account",
   "is_system_generated": 0,
   "modified": "2025-04-21 13:49:35.719952",
@@ -669,22 +653,6 @@
   "property": "allow_on_submit",
   "property_type": "check",
   "row_name": "",
-  "value": "1"
- },
- {
-  "default_value": null,
-  "doc_type": "Petty Expense",
-  "docstatus": 0,
-  "doctype": "Property Setter",
-  "doctype_or_field": "DocField",
-  "field_name": "journal_entry",
-  "is_system_generated": 0,
-  "modified": "2025-10-24 18:56:25.817124",
-  "module": "convert In word to Vietnamese",
-  "name": "Petty Expense-journal_entry-allow_on_submit",
-  "property": "allow_on_submit",
-  "property_type": "check",
-  "row_name": null,
   "value": "1"
  }
 ]
