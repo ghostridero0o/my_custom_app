@@ -13,6 +13,9 @@ frappe.query_reports["Cash Position Report"] = {
             fieldtype: "Date",
             default: frappe.datetime.get_today(),
             reqd: 1,
+            on_change: function() {
+                frappe.query_report.refresh(); // 👈 Tự refresh khi đổi ngày
+            }
         },
         {
             fieldname: "currency",

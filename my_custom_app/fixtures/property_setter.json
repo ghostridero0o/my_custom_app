@@ -654,5 +654,21 @@
   "property_type": "check",
   "row_name": "",
   "value": "1"
+ },
+ {
+  "default_value": null,
+  "doc_type": "Additional Salary",
+  "docstatus": 0,
+  "doctype": "Property Setter",
+  "doctype_or_field": "DocField",
+  "field_name": "type",
+  "is_system_generated": 0,
+  "modified": "2025-11-05 18:21:18.506533",
+  "module": "convert In word to Vietnamese",
+  "name": "Additional Salary-type-allow_on_submit",
+  "property": "allow_on_submit",
+  "property_type": "check",
+  "row_name": null,
+  "value": "1"
  }
 ]

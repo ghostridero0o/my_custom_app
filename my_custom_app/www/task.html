@@ -1,0 +1,29 @@
+{% extends "templates/web.html" %}
+
+{% block title %}Task Dashboard{% endblock %}
+
+{% block page_content %}
+  <div class="container">
+    <h1>Công việc cần hoàn thành</h1>
+    <table id="task-table">
+      <thead>
+        <tr>
+          <th>STT</th>
+          <th>Tên Task</th>
+          <th>Trạng thái</th>
+          <th>Dự án</th>
+          <th>Phụ trách</th>
+          <th>Hạn</th>
+          <th>Ngày sửa đổi</th>
+        </tr>
+      </thead>
+      <tbody id="task-list">
+        <tr><td colspan="7" style="text-align:center;">Đang tải...</td></tr>
+      </tbody>
+    </table>
+    
+    <div id="load-more-container" style="text-align:center; margin-top: 20px;">
+        <button id="load-more-btn" style="padding: 10px 20px; font-size: 14px; cursor: pointer; display: none; background-color: #007bff; color: white; border: none; border-radius: 4px;">Xem thêm</button>
+    </div>
+  </div>
+{% endblock %}
