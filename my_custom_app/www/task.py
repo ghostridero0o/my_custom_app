@@ -29,7 +29,7 @@ def get_context(context):
             "icon": "user"
         },
         {
-            "label": "Tất cả công việc",
+            "label": "Bảng chi tiết công việc",
             "route": "/app/task",
             "icon": "list"
         },
