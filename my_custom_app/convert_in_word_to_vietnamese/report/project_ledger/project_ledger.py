@@ -133,12 +133,21 @@ def get_cash_flow_data(filters):
     # ==== Nhân công trực tiếp (6221, against chứa 3349) ====
     nhan_cong = []
     total_nhan_cong = 0
-    nc_account = frappe.db.get_value("Account", {"account_number": "6221"}, "name")
+    nc_account = frappe.get_all(
+    "Account",
+    filters={
+        "account_number": ["in", ["6221", "6271", "6421"]],
+        "is_group": 0,
+        "company": filters.company
+    },
+    pluck="name")
 
     if nc_account:
         nc_filters = get_common_filters(filters)
-        nc_filters["account"] = nc_account
+        nc_filters["account"] = ["in", nc_account]
         nc_filters["against"] = ["like", "%3349%"]
+        frappe.logger().info(nc_filters)
+
 
         nc_entries = frappe.get_all("GL Entry",
             filters=nc_filters,
