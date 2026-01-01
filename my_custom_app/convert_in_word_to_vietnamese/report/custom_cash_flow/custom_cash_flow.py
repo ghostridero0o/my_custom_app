@@ -157,6 +157,7 @@ def get_cash_flow_accounts():
 			{"account_type": "Payable", "label": _("Net Change in Accounts Payable")},
 			{"account_type": "Tax", "label": _("Net Change in Taxes Payable")},
 			{"account_type": "Stock", "label": _("Net Change in Inventory")},
+			{"account_type": "Current Asset", "label": _("Net Change in Other Current Assets")},
 		],
 	}
 
