@@ -2,6 +2,17 @@
  {
   "docstatus": 0,
   "doctype": "Client Script",
+  "dt": "Salary Slip",
+  "enabled": 1,
+  "modified": "2026-01-05 18:09:41.959415",
+  "module": "convert In word to Vietnamese",
+  "name": "Tính Present Days",
+  "script": "frappe.ui.form.on(\"Salary Slip\", {\n    refresh(frm) {\n        frm.trigger(\"calculate_present_days\");\n    },\n    employee(frm) {\n        frm.trigger(\"calculate_present_days\");\n    },\n    start_date(frm) {\n        frm.trigger(\"calculate_present_days\");\n    },\n    end_date(frm) {\n        frm.trigger(\"calculate_present_days\");\n    },\n    payment_days(frm) {\n        frm.trigger(\"calculate_present_days\");\n    },\n    calculate_present_days(frm) {\n        if (!frm.doc.employee || !frm.doc.start_date || !frm.doc.end_date) {\n            frm.set_value(\"present_days\", 0);\n            return;\n        }\n\n        frappe.call({\n            method: \"frappe.client.get_list\",\n            args: {\n                doctype: \"Attendance\",\n                filters: {\n                    employee: frm.doc.employee,\n                    attendance_date: [\"between\", [frm.doc.start_date, frm.doc.end_date]],\n                    docstatus: 1,\n                },\n                fields: [\"status\", \"leave_type\"],\n                limit_page_length: 0,\n            },\n        }).then(({ message }) => {\n            const entries = message || [];\n            let present = 0;\n            let halfDay = 0;\n            const leaveTypes = new Set();\n\n            entries.forEach((row) => {\n                if (row.status === \"Present\") present += 1;\n                if (row.status === \"Half Day\") halfDay += 1;\n                if (row.status === \"On Leave\" && row.leave_type) {\n                    leaveTypes.add(row.leave_type);\n                }\n            });\n\n            const updatePresentDays = (paidLeaveDays = 0) => {\n                const totalPresentDays = present + halfDay * 0.5 + paidLeaveDays;\n                frm.set_value(\"present_days\", totalPresentDays);\n            };\n\n            if (!leaveTypes.size) {\n                updatePresentDays();\n                return;\n            }\n\n            frappe\n                .call({\n                    method: \"frappe.client.get_list\",\n                    args: {\n                        doctype: \"Leave Type\",\n                        filters: {\n                            name: [\"in\", Array.from(leaveTypes)],\n                            is_lwp: 0,\n                        },\n                        fields: [\"name\"],\n                        limit_page_length: 0,\n                    },\n                })\n                .then(({ message: leaveTypeDocs }) => {\n                    const paidLeaveTypeSet = new Set((leaveTypeDocs || []).map((d) => d.name));\n                    const paidLeaveDays = entries.filter(\n                        (row) => row.status === \"On Leave\" && paidLeaveTypeSet.has(row.leave_type)\n                    ).length;\n\n                    updatePresentDays(paidLeaveDays);\n                });\n        });\n    },\n});\n",
+  "view": "Form"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Client Script",
   "dt": "Project",
   "enabled": 1,
   "modified": "2025-06-03 23:47:36.264289",
