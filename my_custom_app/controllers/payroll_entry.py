@@ -10,7 +10,11 @@ from hrms.payroll.doctype.payroll_entry.payroll_entry import PayrollEntry, submi
 from hrms.payroll.doctype.payroll_entry.payroll_entry import get_existing_salary_slips, show_payroll_submission_status
 from frappe.utils import get_link_to_form
 from hrms.payroll.doctype.salary_slip.salary_slip import SalarySlip, make_loan_repayment_entry
-from hrms.payroll.doctype.payroll_entry.payroll_entry import get_salary_withholdings, get_start_end_dates
+from hrms.payroll.doctype.payroll_entry.payroll_entry import (
+	get_salary_withholdings,
+	get_start_end_dates,
+	log_payroll_failure,
+)
 from frappe.utils import flt
 from erpnext.accounts.doctype.accounting_dimension.accounting_dimension import (
 	get_accounting_dimensions,
@@ -18,6 +22,144 @@ from erpnext.accounts.doctype.accounting_dimension.accounting_dimension import (
 
 
 class CustomPayrollEntry(PayrollEntry):
+	def validate_payroll_payable_account(self):
+		account_type = frappe.db.get_value("Account", self.payroll_payable_account, "account_type")
+		if account_type and account_type != "Payable":
+			frappe.throw(
+				_(
+					"Account type cannot be set for payroll payable account {0}, please remove and try again"
+				).format(frappe.bold(get_link_to_form("Account", self.payroll_payable_account)))
+			)
+	
+	def make_journal_entry(
+		self,
+		accounts,
+		currencies,
+		payroll_payable_account=None,
+		voucher_type="Journal Entry",
+		user_remark="",
+		submitted_salary_slips=None,
+		submit_journal_entry=False,
+		employee_wise_accounting_enabled=False,
+	):
+		multi_currency = 0
+		if len(currencies) > 1:
+			multi_currency = 1
+
+		journal_entry = frappe.new_doc("Journal Entry")
+		journal_entry.voucher_type = voucher_type
+		journal_entry.user_remark = user_remark
+		journal_entry.company = self.company
+		journal_entry.posting_date = self.posting_date
+		journal_entry.party_not_required = True if not employee_wise_accounting_enabled else False
+
+		journal_entry.set("accounts", accounts)
+		journal_entry.multi_currency = multi_currency
+
+		if voucher_type == "Journal Entry":
+			journal_entry.title = payroll_payable_account
+
+		# Skip party validation for payroll-generated JVs
+		journal_entry.skip_payroll_party_validation = True
+		# Skip validation (including party requirement) for payroll-generated JVs
+		journal_entry.flags.ignore_validate = True
+
+		journal_entry.save(ignore_permissions=True)
+
+		try:
+			if submit_journal_entry:
+				journal_entry.submit()
+
+			if submitted_salary_slips:
+				self.set_journal_entry_in_salary_slips(submitted_salary_slips, jv_name=journal_entry.name)
+
+		except Exception as e:
+			if type(e) in (str, list, tuple):
+				frappe.msgprint(e)
+
+			self.log_error("Journal Entry creation against Salary Slip failed")
+			raise
+
+		return journal_entry
+	def _compute_present_days(self, employee):
+		attendance = frappe.get_all(
+			"Attendance",
+			filters={
+				"employee": employee,
+				"attendance_date": ("between", [self.start_date, self.end_date]),
+				"docstatus": 1,
+			},
+			fields=["status", "leave_type"],
+		)
+
+		present = sum(1 for row in attendance if row.status == "Present")
+		half_day = sum(1 for row in attendance if row.status == "Half Day")
+
+		leave_types = {row.leave_type for row in attendance if row.status == "On Leave" and row.leave_type}
+		paid_leave_types = set()
+		if leave_types:
+			paid_leave_types = {
+				lt.name
+				for lt in frappe.get_all(
+					"Leave Type", filters={"name": ("in", leave_types), "is_lwp": 0}, fields=["name"]
+				)
+			}
+
+		paid_leave_days = sum(
+			1
+			for row in attendance
+			if row.status == "On Leave" and row.leave_type and row.leave_type in paid_leave_types
+		)
+
+		return present + (half_day * 0.5) + paid_leave_days
+
+	@frappe.whitelist()
+	def create_salary_slips(self):
+		"""Override to inject present_days so component formulas can use it server-side."""
+		self.check_permission("write")
+		employees = [emp.employee for emp in self.employees]
+
+		if not employees:
+			return
+
+		present_days_map = {emp: self._compute_present_days(emp) for emp in employees}
+
+		args = frappe._dict(
+			{
+				"salary_slip_based_on_timesheet": self.salary_slip_based_on_timesheet,
+				"payroll_frequency": self.payroll_frequency,
+				"start_date": self.start_date,
+				"end_date": self.end_date,
+				"company": self.company,
+				"posting_date": self.posting_date,
+				"deduct_tax_for_unclaimed_employee_benefits": self.deduct_tax_for_unclaimed_employee_benefits,
+				"deduct_tax_for_unsubmitted_tax_exemption_proof": self.deduct_tax_for_unsubmitted_tax_exemption_proof,
+				"payroll_entry": self.name,
+				"exchange_rate": self.exchange_rate,
+				"currency": self.currency,
+			}
+		)
+		if len(employees) > 30 or frappe.flags.enqueue_payroll_entry:
+			self.db_set("status", "Queued")
+			frappe.enqueue(
+				create_salary_slips_for_employees_with_present_days,
+				timeout=3000,
+				employees=employees,
+				args=args,
+				present_days_map=present_days_map,
+				publish_progress=False,
+			)
+			frappe.msgprint(
+				_("Salary Slip creation is queued. It may take a few minutes"),
+				alert=True,
+				indicator="blue",
+			)
+		else:
+			create_salary_slips_for_employees_with_present_days(
+				employees, args, present_days_map, publish_progress=False
+			)
+			self.reload()
+
 	def get_salary_components(self, component_type):
 		salary_slips = self.get_sal_slip_list(ss_status=1, as_dict=True)
 
@@ -269,6 +411,52 @@ class CustomPayrollEntry(PayrollEntry):
 
 
 
+def create_salary_slips_for_employees_with_present_days(
+	employees, args, present_days_map, publish_progress=True
+):
+	payroll_entry = frappe.get_cached_doc("Payroll Entry", args.payroll_entry)
+
+	try:
+		salary_slips_exist_for = get_existing_salary_slips(employees, args)
+		count = 0
+
+		employees = list(set(employees) - set(salary_slips_exist_for))
+		for emp in employees:
+			args.update(
+				{
+					"doctype": "Salary Slip",
+					"employee": emp,
+					"present_days": present_days_map.get(emp, 0),
+				}
+			)
+			frappe.get_doc(args).insert()
+
+			count += 1
+			if publish_progress:
+				frappe.publish_progress(
+					count * 100 / len(employees),
+					title=_("Creating Salary Slips..."),
+				)
+
+		payroll_entry.db_set({"status": "Submitted", "salary_slips_created": 1, "error_message": ""})
+
+		if salary_slips_exist_for:
+			frappe.msgprint(
+				_(
+					"Salary Slips already exist for employees {}, and will not be processed by this payroll."
+				).format(frappe.bold(", ".join(emp for emp in salary_slips_exist_for))),
+				title=_("Message"),
+				indicator="orange",
+			)
+
+	except Exception as e:
+		frappe.db.rollback()
+		log_payroll_failure("creation", payroll_entry, e)
+
+	finally:
+		frappe.db.commit()  # nosemgrep
+		frappe.publish_realtime("completed_salary_slip_creation", user=frappe.session.user)
+
 
 class CustomSalarySlip(SalarySlip):
 	def get_status(self):
@@ -356,4 +544,3 @@ class CustomSalarySlip(SalarySlip):
 			'project': "",  # Project trống
 			'percentage': remaining_percentage  # Tỷ lệ phần trăm còn lại
 		})
-
