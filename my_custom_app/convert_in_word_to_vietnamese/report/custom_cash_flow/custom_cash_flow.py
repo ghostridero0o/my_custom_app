@@ -220,6 +220,20 @@ def get_account_type_based_gl_data(company, filters=None):
 		filters.cost_center = get_cost_centers_with_children(filters.cost_center)
 		cond += " and cost_center in %(cost_center)s"
 
+	account_filter = "account in ( SELECT name FROM tabAccount WHERE account_type = %(account_type)s)"
+	if filters.account_type == "Payable":
+		# Also include child accounts whose parent has one of the specified account numbers
+		filters.payable_parent_numbers = ("334", "335", "336", "338")
+		account_filter = """
+			account in (
+				SELECT name FROM tabAccount
+				WHERE account_type = %(account_type)s
+				OR parent_account in (
+					SELECT name FROM tabAccount WHERE account_number in %(payable_parent_numbers)s
+				)
+			)
+		"""
+
 	gl_sum = frappe.db.sql_list(
 		f"""
 		select sum(credit) - sum(debit)
@@ -227,7 +241,7 @@ def get_account_type_based_gl_data(company, filters=None):
 		where company=%(company)s and posting_date >= %(start_date)s and posting_date <= %(end_date)s
 			and voucher_type != 'Period Closing Voucher'
 			and ifnull(is_opening, '') != 'Yes'
-			and account in ( SELECT name FROM tabAccount WHERE account_type = %(account_type)s) {cond}
+			and {account_filter} {cond}
 	""",
 		filters,
 	)
