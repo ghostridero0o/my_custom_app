@@ -22,65 +22,6 @@ from erpnext.accounts.doctype.accounting_dimension.accounting_dimension import (
 
 
 class CustomPayrollEntry(PayrollEntry):
-	def validate_payroll_payable_account(self):
-		account_type = frappe.db.get_value("Account", self.payroll_payable_account, "account_type")
-		if account_type and account_type != "Payable":
-			frappe.throw(
-				_(
-					"Account type cannot be set for payroll payable account {0}, please remove and try again"
-				).format(frappe.bold(get_link_to_form("Account", self.payroll_payable_account)))
-			)
-	
-	def make_journal_entry(
-		self,
-		accounts,
-		currencies,
-		payroll_payable_account=None,
-		voucher_type="Journal Entry",
-		user_remark="",
-		submitted_salary_slips=None,
-		submit_journal_entry=False,
-		employee_wise_accounting_enabled=False,
-	):
-		multi_currency = 0
-		if len(currencies) > 1:
-			multi_currency = 1
-
-		journal_entry = frappe.new_doc("Journal Entry")
-		journal_entry.voucher_type = voucher_type
-		journal_entry.user_remark = user_remark
-		journal_entry.company = self.company
-		journal_entry.posting_date = self.posting_date
-		journal_entry.party_not_required = True if not employee_wise_accounting_enabled else False
-
-		journal_entry.set("accounts", accounts)
-		journal_entry.multi_currency = multi_currency
-
-		if voucher_type == "Journal Entry":
-			journal_entry.title = payroll_payable_account
-
-		# Skip party validation for payroll-generated JVs
-		journal_entry.skip_payroll_party_validation = True
-		# Skip validation (including party requirement) for payroll-generated JVs
-		journal_entry.flags.ignore_validate = True
-
-		journal_entry.save(ignore_permissions=True)
-
-		try:
-			if submit_journal_entry:
-				journal_entry.submit()
-
-			if submitted_salary_slips:
-				self.set_journal_entry_in_salary_slips(submitted_salary_slips, jv_name=journal_entry.name)
-
-		except Exception as e:
-			if type(e) in (str, list, tuple):
-				frappe.msgprint(e)
-
-			self.log_error("Journal Entry creation against Salary Slip failed")
-			raise
-
-		return journal_entry
 	def _compute_present_days(self, employee):
 		attendance = frappe.get_all(
 			"Attendance",
@@ -115,7 +56,7 @@ class CustomPayrollEntry(PayrollEntry):
 
 	@frappe.whitelist()
 	def create_salary_slips(self):
-		"""Override to inject present_days so component formulas can use it server-side."""
+		"""Override to set present_days on Salary Slips during creation."""
 		self.check_permission("write")
 		employees = [emp.employee for emp in self.employees]
 
@@ -286,8 +227,9 @@ class CustomPayrollEntry(PayrollEntry):
 		currencies,
 		company_currency,
 		payable_amount,
-		project,
+		accounting_dimensions,
 		precision,  # Set a default value for precision
+		project=None,
 		entry_type="credit",
 		party=None,
 		accounts=None,
@@ -310,6 +252,8 @@ class CustomPayrollEntry(PayrollEntry):
 			# Gán project vào row chỉ khi project không phải là danh sách
 			row["project"] = project  # Gán project vào row nếu không phải là danh sách
 		
+		self.update_accounting_dimensions(row, accounting_dimensions)
+
 		if entry_type == "debit":
 			payable_amount += flt(amount, precision)
 			row.update(
@@ -378,6 +322,7 @@ class CustomPayrollEntry(PayrollEntry):
 				currencies=currencies,
 				company_currency=company_currency,
 				payable_amount=payable_amount,
+				accounting_dimensions=accounting_dimensions,
 				project=project,
 				precision=precision,
 				entry_type="debit",
@@ -394,6 +339,7 @@ class CustomPayrollEntry(PayrollEntry):
 				currencies=currencies,
 				company_currency=company_currency,
 				payable_amount=payable_amount,
+				accounting_dimensions=accounting_dimensions,
 				project=project,
 				precision=precision,
 				entry_type="credit",
