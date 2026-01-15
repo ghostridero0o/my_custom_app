@@ -1,0 +1,53 @@
+{
+    "doctype": "Report",
+    "module": "convert In word to Vietnamese",
+    "name": "Sales Order BOM Report",
+    "is_standard": "Yes",
+    "ref_doctype": "Sales Order",
+    "report_type": "Script Report",
+    "filters": [
+        {
+            "fieldname": "company",
+            "label": "Company",
+            "fieldtype": "Link",
+            "options": "Company",
+            "reqd": 1
+        },
+        {
+            "fieldname": "from_date",
+            "label": "From Date",
+            "fieldtype": "Date",
+            "reqd": 1
+        },
+        {
+            "fieldname": "to_date",
+            "label": "To Date",
+            "fieldtype": "Date",
+            "reqd": 1
+        },
+        {
+            "fieldname": "cost_center",
+            "label": "Cost Center",
+            "fieldtype": "Link",
+            "options": "Cost Center"
+        },
+        {
+            "fieldname": "project",
+            "label": "Project",
+            "fieldtype": "Link",
+            "options": "Project"
+        },
+        {
+            "fieldname": "item_group",
+            "label": "Item Group",
+            "fieldtype": "Link",
+            "options": "Item Group"
+        },
+        {
+            "fieldname": "item",
+            "label": "Item",
+            "fieldtype": "Link",
+            "options": "Item"
+        }
+    ]
+}
