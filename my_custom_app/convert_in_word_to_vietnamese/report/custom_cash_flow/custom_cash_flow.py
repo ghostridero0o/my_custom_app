@@ -25,6 +25,9 @@ from erpnext.accounts.utils import get_fiscal_year
 
 
 def execute(filters=None):
+	if filters and filters.get("project") and not isinstance(filters.get("project"), list):
+		filters.project = frappe.parse_json(filters.get("project"))
+
 	period_list = get_period_list(
 		filters.from_fiscal_year,
 		filters.to_fiscal_year,
@@ -215,6 +218,9 @@ def get_account_type_based_gl_data(company, filters=None):
 		cond = " AND (finance_book in (%s, '') OR finance_book IS NULL)" % (
 			frappe.db.escape(cstr(filters.finance_book))
 		)
+
+	if filters.get("project"):
+		cond += " and project in %(project)s"
 
 	if filters.get("cost_center"):
 		filters.cost_center = get_cost_centers_with_children(filters.cost_center)
