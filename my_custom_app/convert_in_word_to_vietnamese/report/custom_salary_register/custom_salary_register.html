@@ -26,7 +26,7 @@
 \t<div style="margin-bottom: 7px;" class="text-center">
 \t\t{%= frappe.boot.letter_heads[filters.letter_head || frappe.defaults.get_default("letter_head")].header %}
 \t</div>
-\t<h2 class="text-center">{%= __(report.report_name) %}</h2>
+\t<h2 class="text-center">{%= __("BẢNG LƯƠNG THÁNG") %}</h2>
 \t<h5 class="text-center">
 \t\t{%= __("From {0} to {1}", [frappe.datetime.str_to_user(filters.from_date), frappe.datetime.str_to_user(filters.to_date)]) %}
 \t</h5>
