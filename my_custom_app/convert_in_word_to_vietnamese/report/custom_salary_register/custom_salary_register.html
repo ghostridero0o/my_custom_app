@@ -1,0 +1,71 @@
+<style>
+\t.custom-salary-register {
+\t\tfont-size: 11px;
+\t}
+\t.custom-salary-register table {
+\t\twidth: 100%;
+\t\tborder-collapse: collapse;
+\t}
+\t.custom-salary-register th,
+\t.custom-salary-register td {
+\t\tborder: 1px solid #ccc;
+\t\tpadding: 6px 8px;
+\t}
+\t.custom-salary-register th {
+\t\tbackground: #f6f7fb;
+\t\ttext-align: center;
+\t\tfont-weight: 600;
+\t}
+\t.custom-salary-register td.num {
+\t\ttext-align: right;
+\t\twhite-space: nowrap;
+\t}
+</style>
+
+<div class="custom-salary-register">
+\t<div style="margin-bottom: 7px;" class="text-center">
+\t\t{%= frappe.boot.letter_heads[filters.letter_head || frappe.defaults.get_default("letter_head")].header %}
+\t</div>
+\t<h2 class="text-center">{%= __(report.report_name) %}</h2>
+\t<h5 class="text-center">
+\t\t{%= __("From {0} to {1}", [frappe.datetime.str_to_user(filters.from_date), frappe.datetime.str_to_user(filters.to_date)]) %}
+\t</h5>
+\t<hr>
+
+\t<table class="table table-bordered">
+\t\t<thead>
+\t\t\t<tr>
+\t\t\t\t<th>{%= __("Tên nhân viên") %}</th>
+\t\t\t\t<th>{%= __("Phòng ban") %}</th>
+\t\t\t\t<th class="text-right">{%= __("Số ngày chấm công") %}</th>
+\t\t\t\t<th class="text-right">{%= __("Tổng thu nhập") %}</th>
+\t\t\t\t<th class="text-right">{%= __("Tổng giảm trừ") %}</th>
+\t\t\t\t<th class="text-right">{%= __("Thực lĩnh") %}</th>
+\t\t\t\t<th class="text-right">{%= __("Đã Nhận CK") %}</th>
+\t\t\t\t<th class="text-right">{%= __("Đối trừ") %}</th>
+\t\t\t\t<th class="text-right">{%= __("Số ngày thanh toán") %}</th>
+\t\t\t</tr>
+\t\t</thead>
+\t\t<tbody>
+\t\t\t{% for(var j=0, k=data.length; j<k; j++) { %}
+\t\t\t\t{%
+\t\t\t\t\tvar row = data[j];
+\t\t\t\t%}
+\t\t\t\t<tr>
+\t\t\t\t\t<td>{%= row.employee_name || "" %}</td>
+\t\t\t\t\t<td>{%= row.department || "" %}</td>
+\t\t\t\t\t<td class="text-right">{%= row.present_days || 0 %}</td>
+\t\t\t\t\t<td class="text-right">{%= format_currency(row.gross_pay || 0, row.currency) %}</td>
+\t\t\t\t\t<td class="text-right">{%= format_currency(row.total_deduction || 0, row.currency) %}</td>
+\t\t\t\t\t<td class="text-right">{%= format_currency(row.net_pay || 0, row.currency) %}</td>
+\t\t\t\t\t<td class="text-right">{%= format_currency(row.custom_da_nhan_ck || 0, row.currency) %}</td>
+\t\t\t\t\t<td class="text-right">{%= format_currency(row.custom_doi_tru || 0, row.currency) %}</td>
+\t\t\t\t\t<td class="text-right">{%= row.payment_days || 0 %}</td>
+\t\t\t\t</tr>
+\t\t\t{% } %}
+\t\t</tbody>
+\t</table>
+\t<p class="text-right text-muted">
+\t\t{%= __("Printed On {0}", [frappe.datetime.str_to_user(frappe.datetime.get_datetime_as_string())]) %}
+\t</p>
+</div>
