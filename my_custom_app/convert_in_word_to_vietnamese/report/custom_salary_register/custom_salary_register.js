@@ -2,6 +2,7 @@
 // For license information, please see license.txt
 
 frappe.query_reports["Custom Salary Register"] = {
+	html_format: "custom_salary_register",
 	filters: [
 		{
 			fieldname: "from_date",

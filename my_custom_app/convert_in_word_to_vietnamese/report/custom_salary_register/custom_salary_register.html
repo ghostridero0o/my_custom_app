@@ -43,14 +43,10 @@
 \t\t\t\t<th class="text-right">{%= __("Thực lĩnh") %}</th>
 \t\t\t\t<th class="text-right">{%= __("Đã Nhận CK") %}</th>
 \t\t\t\t<th class="text-right">{%= __("Đối trừ") %}</th>
-\t\t\t\t<th class="text-right">{%= __("Số ngày thanh toán") %}</th>
 \t\t\t</tr>
 \t\t</thead>
 \t\t<tbody>
-\t\t\t{% for(var j=0, k=data.length; j<k; j++) { %}
-\t\t\t\t{%
-\t\t\t\t\tvar row = data[j];
-\t\t\t\t%}
+\t\t\t{% for(var j=0, k=data.length; j<k; j++) { var row = data[j]; %}
 \t\t\t\t<tr>
 \t\t\t\t\t<td>{%= row.employee_name || "" %}</td>
 \t\t\t\t\t<td>{%= row.department || "" %}</td>
@@ -60,7 +56,6 @@
 \t\t\t\t\t<td class="text-right">{%= format_currency(row.net_pay || 0, row.currency) %}</td>
 \t\t\t\t\t<td class="text-right">{%= format_currency(row.custom_da_nhan_ck || 0, row.currency) %}</td>
 \t\t\t\t\t<td class="text-right">{%= format_currency(row.custom_doi_tru || 0, row.currency) %}</td>
-\t\t\t\t\t<td class="text-right">{%= row.payment_days || 0 %}</td>
 \t\t\t\t</tr>
 \t\t\t{% } %}
 \t\t</tbody>
