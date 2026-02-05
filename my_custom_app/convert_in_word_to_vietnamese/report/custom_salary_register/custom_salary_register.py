@@ -53,6 +53,8 @@ def execute(filters=None):
 			"payment_days": ss.payment_days,
 			"currency": currency or company_currency,
 			"total_loan_repayment": ss.total_loan_repayment,
+			"custom_da_nhan_ck": ss.custom_da_nhan_ck,
+			"custom_doi_tru": ss.custom_doi_tru,
 		}
 
 		update_column_width(ss, columns)
@@ -70,6 +72,8 @@ def execute(filters=None):
 					"total_deduction": (flt(ss.total_deduction) + flt(ss.total_loan_repayment))
 					* flt(ss.exchange_rate),
 					"net_pay": flt(ss.net_pay) * flt(ss.exchange_rate),
+					"custom_da_nhan_ck": flt(ss.custom_da_nhan_ck) * flt(ss.exchange_rate),
+					"custom_doi_tru": flt(ss.custom_doi_tru) * flt(ss.exchange_rate),
 				}
 			)
 
@@ -79,6 +83,8 @@ def execute(filters=None):
 					"gross_pay": ss.gross_pay,
 					"total_deduction": flt(ss.total_deduction) + flt(ss.total_loan_repayment),
 					"net_pay": ss.net_pay,
+					"custom_da_nhan_ck": ss.custom_da_nhan_ck,
+					"custom_doi_tru": ss.custom_doi_tru,
 				}
 			)
 
@@ -253,6 +259,20 @@ def get_columns(earning_types, ded_types):
 			{
 				"label": _("Thực lĩnh"),
 				"fieldname": "net_pay",
+				"fieldtype": "Currency",
+				"options": "currency",
+				"width": 120,
+			},
+			{
+				"label": _("Đã Nhận CK"),
+				"fieldname": "custom_da_nhan_ck",
+				"fieldtype": "Currency",
+				"options": "currency",
+				"width": 120,
+			},
+			{
+				"label": _("Đối trừ"),
+				"fieldname": "custom_doi_tru",
 				"fieldtype": "Currency",
 				"options": "currency",
 				"width": 120,
