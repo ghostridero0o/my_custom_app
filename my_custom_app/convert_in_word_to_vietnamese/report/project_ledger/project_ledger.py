@@ -4,6 +4,9 @@ from frappe.utils import flt
 
 def execute(filters=None):
     filters = frappe._dict(filters or {})
+    if filters.get("project") and not isinstance(filters.get("project"), list):
+        filters.project = frappe.parse_json(filters.get("project"))
+
     columns = get_columns()
     data = []
 
@@ -40,7 +43,7 @@ def get_common_filters(filters):
     if filters.get("finance_book"):
         common_filters["finance_book"] = filters.finance_book
     if filters.get("project"):
-        common_filters["project"] = filters.project
+        common_filters["project"] = ["in", filters.project]
     if filters.get("cost_center"):
         common_filters["cost_center"] = filters.cost_center
     if filters.get("voucher_type"):

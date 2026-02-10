@@ -57,9 +57,13 @@ function get_filters() {
         {
             fieldname: "project",
             label: "Project",
-            fieldtype: "Link",
+            fieldtype: "MultiSelectList",
             options: "Project",
-            reqd: 1
+            get_data: function (txt) {
+                return frappe.db.get_link_options("Project", txt, {
+                    company: frappe.query_report.get_filter_value("company")
+                });
+            }
         },
         {
             fieldname: "cost_center",
