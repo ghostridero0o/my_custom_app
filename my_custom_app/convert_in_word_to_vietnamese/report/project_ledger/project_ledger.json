@@ -39,7 +39,7 @@
   },
   {
    "fieldname": "project",
-   "fieldtype": "Link",
+   "fieldtype": "MultiSelectList",
    "label": "Project",
    "mandatory": 0,
    "options": "Project",
