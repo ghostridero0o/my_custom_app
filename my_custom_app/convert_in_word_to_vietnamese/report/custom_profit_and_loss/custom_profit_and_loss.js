@@ -99,8 +99,14 @@ frappe.query_reports["Custom Profit And Loss"] = {
     initial_depth: 0,
     formatter: function(value, row, column, data, default_formatter) {
         const selected_view = frappe.query_report.get_filter_value("selected_view");
+        const columns = frappe.query_report && frappe.query_report.columns ? frappe.query_report.columns : [];
+        const first_period_col = columns.find(col => col && col.fieldtype === "Currency");
+        const is_first_period = first_period_col && column.fieldname === first_period_col.fieldname;
 
         if (selected_view === "Growth" && data && column.fieldtype === "Currency") {
+            if (is_first_period) {
+                return default_formatter(value, row, column, data);
+            }
             const growthPercent = data[column.fieldname];
             if (growthPercent === undefined || growthPercent === null) {
                 return "NA";

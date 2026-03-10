@@ -112,6 +112,7 @@ def execute(filters=None):
             conditions = """
                 company=%(company)s AND account=%(account)s AND is_cancelled=0
                 AND posting_date BETWEEN %(from_date)s AND %(to_date)s
+                AND voucher_type != 'Period Closing Voucher'
             """
 
             params = {
@@ -392,7 +393,7 @@ def apply_growth_view(data, period_list):
                 continue
 
             if idx == 0:
-                data[row_idx][key] = None
+                # keep original value for the first period
                 continue
 
             prev_val = row.get(keys[idx - 1])
