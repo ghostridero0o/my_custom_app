@@ -8,7 +8,7 @@ frappe.ui.form.on("Employee Incentive", {
                 filters: {
                     type: "earning",
                     company: frm.doc.company,
-                    is_flexible_benefit: 1,  // thêm điều kiện này vào
+                    
                     disabled: 0              // tuỳ chọn, nếu cần lọc theo trạng thái active
                 },
             };
