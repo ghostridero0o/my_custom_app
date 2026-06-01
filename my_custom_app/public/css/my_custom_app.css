@@ -1,0 +1,54 @@
+:root,
+[data-theme="light"],
+[data-theme="dark"] {
+	--custom-navbar-color: #22c55e;
+	--custom-navbar-image: none;
+	--custom-navbar-text-color: #ffd900;
+	--custom-navbar-overlay: transparent;
+}
+
+body header.navbar,
+body header.navbar.navbar-expand,
+body .navbar.navbar-expand,
+body .navbar {
+	position: relative;
+	background: var(--custom-navbar-color) !important;
+	background-color: var(--custom-navbar-color) !important;
+	background-image: var(--custom-navbar-image) !important;
+	background-position: center !important;
+	background-repeat: no-repeat !important;
+	background-size: cover !important;
+	border-bottom: none !important;
+}
+
+body header.navbar::before,
+body header.navbar.navbar-expand::before,
+body .navbar.navbar-expand::before,
+body .navbar::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background: var(--custom-navbar-overlay);
+	pointer-events: none;
+}
+
+body header.navbar > .container,
+body header.navbar.navbar-expand > .container,
+body .navbar.navbar-expand > .container,
+body .navbar > .container {
+	position: relative;
+	z-index: 1;
+}
+
+.navbar .nav-link,
+.navbar .navbar-brand,
+.navbar .search-bar svg {
+	color: var(--custom-navbar-text-color) !important;
+	stroke: var(--custom-navbar-text-color);
+}
+
+#navbar-breadcrumbs a,
+#navbar-breadcrumbs li a,
+#navbar-breadcrumbs > li > a::before {
+	color: var(--custom-navbar-text-color) !important;
+}
