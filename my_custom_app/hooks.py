@@ -166,7 +166,10 @@ scheduler_events = {
     "cron": {
         "0 8 * * *": [  # phút 0, giờ 8 sáng mỗi ngày
             "my_custom_app.scheduler.reminders.send_attendance_list"
-        ]
+        ],
+        "0 19 * * *": [
+            "my_custom_app.raven_cash_report.scheduled_send_daily_reports"
+        ],
     }
 # 	"hourly": [
 # 		"my_custom_app.tasks.hourly"
