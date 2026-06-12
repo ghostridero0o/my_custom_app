@@ -217,6 +217,12 @@ frappe.query_reports["Custom General Ledger"] = {
 			label: __("Ignore System Generated Credit / Debit Notes"),
 			fieldtype: "Check",
 		},
+		{
+			fieldname: "cash_flow_code",
+			label: __("Cash Flow Code"),
+			fieldtype: "Data",
+			hidden: 1,
+		},
 	],
 };
 
@@ -228,4 +234,3 @@ frappe.query_reports["Custom General Ledger"].onload = function (report) {
 		remarks_filter.set_value(1);
 	}
 };
-
