@@ -16,9 +16,30 @@ CHANNELS = {
 		"title": "PC33",
 	},
 }
+REPORT_CHANNEL_NAME = "bao-cao"
+REPORT_CHANNEL_ID = "Raven-bao-cao"
 
 MONEY_RE = re.compile(
 	r"(?P<num>\d{1,3}(?:[.,]\d{3})+|\d+)\s*(?P<unit>trieu|triệu|tr|k|nghin|nghìn|vnd|vnđ|đ|d)?",
+	re.IGNORECASE,
+)
+AMOUNT_LABEL_RE = re.compile(
+	r"(?:"
+	r"số tiền|so tien|amount(?: transferred)?|"
+	r"giá trị giao dịch|gia tri giao dich|"
+	r"số tiền giao dịch|so tien giao dich|"
+	r"thành tiền|thanh tien"
+	r")\s*:?\s*(?P<amount>\d{1,3}(?:[.,]\d{3})+|\d+)\s*(?P<unit>trieu|triệu|tr|k|nghin|nghìn|vnd|vnđ|đ|d)?",
+	re.IGNORECASE,
+)
+NOTE_AMOUNT_RE = re.compile(
+	r"\b(?:thu|chi|nộp|nop|trả|tra|tt|thanh toán|thanh toan|ck|chuyển|chuyen)\b[^\d]{0,30}"
+	r"(?P<amount>\d{1,3}(?:[.,]\d{3})+|\d+)\s*(?P<unit>trieu|triệu|tr|k|nghin|nghìn|vnd|vnđ|đ|d)?",
+	re.IGNORECASE,
+)
+TRAILING_NOTE_AMOUNT_RE = re.compile(
+	r"\b(?:thu|chi|nộp|nop|trả|tra|tt|thanh toán|thanh toan|ck|chuyển|chuyen)\b"
+	r".*?[:：]\s*(?P<amount>\d{1,3}(?:[.,]\d{3})+|\d+)\s*(?P<unit>trieu|triệu|tr|k|nghin|nghìn|vnd|vnđ|đ|d)?\s*$",
 	re.IGNORECASE,
 )
 
@@ -37,17 +58,35 @@ def test_daily_reports(report_date=None, send=0):
 def send_daily_reports(report_date=None, send=True):
 	start, end, report_day = get_report_window(report_date)
 	bot = frappe.get_doc("Raven Bot", "Data Bot")
+	report_channel_id = get_report_channel_id()
 	results = {}
+	reports = []
 
 	for config in CHANNELS.values():
 		messages = get_channel_messages(config["channel_id"], start, end)
 		entries = build_entries(messages)
 		report = render_report(config["title"], report_day, entries)
 		results[config["channel_id"]] = report
-		if send:
-			bot.send_message(config["channel_id"], report, markdown=True)
+		reports.append(report)
+
+	combined_report = "\n\n---\n\n".join(reports)
+	results["sent_to"] = report_channel_id
+	if send:
+		bot.send_message(report_channel_id, combined_report, markdown=True)
 
 	return results
+
+
+def get_report_channel_id():
+	channel_id = frappe.db.get_value(
+		"Raven Channel",
+		{
+			"channel_name": REPORT_CHANNEL_NAME,
+			"is_archived": 0,
+		},
+		"name",
+	)
+	return channel_id or REPORT_CHANNEL_ID
 
 
 def get_report_window(report_date=None):
@@ -112,16 +151,16 @@ def build_entries(messages):
 		if message.get("file"):
 			ocr_text = extract_document_text(message.file)
 
-		source_text = "\n".join([note, ocr_text])
-		amount = extract_amount(source_text)
+		amount = extract_amount(note, ocr_text)
 		if not amount:
 			continue
 
 		source_account, counterparty = parse_parties(ocr_text, message.owner)
+		kind = classify(note, ocr_text)
 		entries.append(
 			{
 				"when": get_datetime(message.creation),
-				"kind": classify(source_text),
+				"kind": kind,
 				"amount": amount,
 				"source_account": source_account,
 				"counterparty": counterparty,
@@ -180,24 +219,43 @@ def clean_text(value):
 	return value.strip()
 
 
-def extract_amount(text):
+def extract_amount(note, ocr_text):
+	for text in [note or "", ocr_text or ""]:
+		amount = extract_labeled_amount(text)
+		if amount:
+			return amount
+	return extract_note_amount(note or "")
+
+
+def extract_labeled_amount(text):
 	text = re.sub(r"\b[\w-]+\.(?:png|jpe?g|webp)\b", " ", text, flags=re.I)
-	candidates = []
+	for match in AMOUNT_LABEL_RE.finditer(text):
+		amount = money_to_int(match)
+		if amount >= 1000:
+			return amount
+	return 0
+
+
+def extract_note_amount(text):
+	match = TRAILING_NOTE_AMOUNT_RE.search(text)
+	if match:
+		amount = money_to_int(match)
+		if amount >= 1000:
+			return amount
+	for match in NOTE_AMOUNT_RE.finditer(text):
+		amount = money_to_int(match)
+		if amount >= 1000:
+			return amount
 	for match in MONEY_RE.finditer(text):
 		amount = money_to_int(match)
 		unit = (match.group("unit") or "").lower()
-		around = text[max(0, match.start() - 30) : match.end() + 30].lower()
-		looks_like_money = bool(unit) or any(
-			keyword in around
-			for keyword in ["số tiền", "so tien", "amount", "chuyển", "chuyen", "vnd", "vnđ", "đ", "tổng", "tong"]
-		)
-		if amount >= 1000 and looks_like_money:
-			candidates.append(amount)
-	return max(candidates) if candidates else 0
+		if amount >= 1000 and unit in {"trieu", "triệu", "tr", "k", "nghin", "nghìn", "vnd", "vnđ", "đ", "d"}:
+			return amount
+	return 0
 
 
 def money_to_int(match):
-	raw = match.group("num").replace(".", "").replace(",", "")
+	raw = (match.groupdict().get("num") or match.groupdict().get("amount")).replace(".", "").replace(",", "")
 	amount = int(raw)
 	unit = (match.group("unit") or "").lower()
 	if unit in {"trieu", "triệu", "tr"}:
@@ -207,11 +265,18 @@ def money_to_int(match):
 	return amount
 
 
-def classify(text):
-	lowered = text.lower()
-	if any(keyword in lowered for keyword in ["nhập quỹ", "nhap quy", "nộp tiền", "nop tien", "trả lại", "tra lai", "thu "]):
+def classify(note, ocr_text):
+	note_lowered = (note or "").lower()
+	ocr_lowered = (ocr_text or "").lower()
+	if re.search(r"\b(thu|nhập quỹ|nhap quy|nộp tiền|nop tien|trả lại|tra lai)\b", note_lowered):
 		return "Thu"
-	return "Chi"
+	if re.search(r"\b(chi|trả tiền|tra tien|tt|thanh toán|thanh toan|ck đi|ck di)\b", note_lowered):
+		return "Chi"
+	if any(keyword in ocr_lowered for keyword in ["nhận tiền", "nhan tien", "credited", "received"]):
+		return "Thu"
+	if any(keyword in ocr_lowered for keyword in ["chuyển tiền thành công", "chuyen tien thanh cong", "amount transferred", "recipient"]):
+		return "Chi"
+	return "Chua ro"
 
 
 def parse_parties(ocr_text, fallback_sender):
@@ -243,7 +308,7 @@ def parse_parties(ocr_text, fallback_sender):
 			break
 
 	if not source:
-		source = f"{fallback_sender} (suy luan tu nguoi gui/noi dung)"
+		source = "Chua doc duoc"
 	if not counterparty:
 		counterparty = "Chua doc duoc"
 
@@ -260,8 +325,9 @@ def render_report(title, report_day, entries):
 		lines.append("Khong co giao dich trong ky bao cao.")
 
 	for index, entry in enumerate(entries, 1):
+		kind_note = " (khong tinh vao tong)" if entry["kind"] == "Chua ro" else ""
 		lines.append(
-			f"{index}. {entry['when'].strftime('%H:%M %d/%m')} - {entry['kind']} {format_money(entry['amount'])}"
+			f"{index}. {entry['when'].strftime('%H:%M %d/%m')} - {entry['kind']}{kind_note} {format_money(entry['amount'])}"
 			f" - TK chuyen di: {entry['source_account']}"
 			f" - Nguoi nhan/nguoi nop: {entry['counterparty']}"
 			f" - {entry['note']}"
