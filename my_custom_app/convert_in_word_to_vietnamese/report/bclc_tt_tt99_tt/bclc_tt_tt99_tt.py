@@ -72,6 +72,9 @@ ROWS = [
 	{"code": "60", "label": "Tiền và tương đương tiền đầu kỳ", "computed": "opening"},
 	{"code": "61", "label": "Ảnh hưởng của thay đổi tỷ giá hối đoái quy đổi ngoại tệ", "computed": "exchange"},
 	{"code": "70", "label": "Tiền và tương đương tiền cuối kỳ (70 = 50+60+61)", "computed": "closing"},
+	{},
+	{"label": "IV. Giao dịch không dùng tiền", "section": 1},
+	{"code": "80", "label": "1. Vay/thuê tài chính giải ngân trực tiếp thanh toán nhà cung cấp", "computed": "non_cash"},
 ]
 
 
@@ -190,6 +193,7 @@ def get_period_values(filters, period_list, account_map, cash_accounts):
 	for period in period_list:
 		period_key = period["key"]
 		cash_flow_details = get_cash_flow_details_by_code(filters, period, account_map, cash_accounts)
+		non_cash_values = get_non_cash_transaction_values(filters, period, account_map)
 
 		for detail in cash_flow_details:
 			code = detail.cash_flow_code
@@ -214,6 +218,7 @@ def get_period_values(filters, period_list, account_map, cash_accounts):
 		values["60"][period_key] = opening
 		values["70"][period_key] = closing
 		values["61"][period_key] = flt(closing - opening - net_change, 2)
+		values["80"][period_key] = non_cash_values.get("80", 0)
 
 	for code, account_map_by_period in period_accounts.items():
 		for key, accounts in account_map_by_period.items():
@@ -250,7 +255,7 @@ def build_data(period_list, period_values, currency, period_accounts, cash_accou
 			out["is_group"] = 1
 			current_section = row["label"]
 		else:
-			if not row.get("total") and row.get("computed") not in ("opening", "exchange", "closing"):
+			if not row.get("total") and row.get("computed") not in ("opening", "exchange", "closing", "non_cash"):
 				out["parent_section"] = current_section
 				out["accounts"] = sorted(cash_accounts)
 				out["period_accounts"] = {
@@ -272,6 +277,15 @@ def build_data(period_list, period_values, currency, period_accounts, cash_accou
 def get_cash_flow_detail_entries(filters):
 	filters = frappe._dict(filters or {})
 	account_map = get_account_map(filters.company)
+	if filters.get("cash_flow_code") == "80":
+		period = frappe._dict(
+			{
+				"from_date": getdate(filters.from_date),
+				"to_date": getdate(filters.to_date),
+			}
+		)
+		return get_non_cash_detail_entries(filters, period, account_map)
+
 	cash_accounts = get_cash_accounts(filters.company, account_map)
 	period = frappe._dict(
 		{
@@ -282,6 +296,84 @@ def get_cash_flow_detail_entries(filters):
 	return get_cash_flow_details_by_code(filters, period, account_map, cash_accounts, filters.get("cash_flow_code"))
 
 
+def get_non_cash_detail_entries(filters, period, account_map):
+	entries_by_voucher = get_non_cash_voucher_entries(filters, period, account_map)
+	details = []
+
+	for entries in entries_by_voucher.values():
+		non_cash_amount = get_direct_loan_supplier_non_cash_amount(entries, account_map)
+		if not non_cash_amount:
+			continue
+
+		details.extend(
+			make_non_cash_detail_rows(
+				entries,
+				account_map,
+				non_cash_amount,
+			)
+		)
+
+	return details
+
+
+def make_non_cash_detail_rows(entries, account_map, non_cash_amount):
+	rows = []
+	rows.extend(
+		make_limited_non_cash_rows(
+			entries,
+			account_map,
+			non_cash_amount,
+			("331", "3318", "1411", "1413"),
+			"debit",
+		)
+	)
+	rows.extend(
+		make_limited_non_cash_rows(
+			entries,
+			account_map,
+			non_cash_amount,
+			("341", "343"),
+			"credit",
+		)
+	)
+	return rows
+
+
+def make_limited_non_cash_rows(entries, account_map, limit, prefixes, side):
+	rows = []
+	remaining = flt(limit)
+
+	for entry in entries:
+		if remaining <= 0:
+			break
+
+		account_number = get_account_number(entry.account, account_map)
+		if not startswith_any(account_number, prefixes):
+			continue
+
+		entry_amount = flt(entry.debit) - flt(entry.credit)
+		if side == "debit":
+			available = max(entry_amount, 0)
+		else:
+			available = max(-entry_amount, 0)
+
+		allocated = min(available, remaining)
+		if not allocated:
+			continue
+
+		row = frappe._dict(entry.copy())
+		row.cash_flow_code = "80"
+		row.debit = allocated if side == "debit" else 0
+		row.credit = allocated if side == "credit" else 0
+		row.debit_in_account_currency = row.debit
+		row.credit_in_account_currency = row.credit
+		row.account_currency = entry.get("account_currency")
+		rows.append(row)
+		remaining = flt(remaining - allocated)
+
+	return rows
+
+
 def get_cash_flow_by_code(filters, period, account_map):
 	amounts = {}
 	cash_accounts = get_cash_accounts(filters.company, account_map)
@@ -290,6 +382,96 @@ def get_cash_flow_by_code(filters, period, account_map):
 		amounts[code] = flt(amounts.get(code, 0) + detail.cash_flow_amount)
 
 	return amounts
+
+
+def get_non_cash_transaction_values(filters, period, account_map):
+	entries_by_voucher = get_non_cash_voucher_entries(filters, period, account_map)
+	values = {"80": 0}
+
+	for entries in entries_by_voucher.values():
+		values["80"] = flt(values["80"] + get_direct_loan_supplier_non_cash_amount(entries, account_map))
+
+	return values
+
+
+def get_non_cash_voucher_entries(filters, period, account_map):
+	conditions, values = get_common_conditions(filters)
+	values.update({"from_date": period["from_date"], "to_date": period["to_date"]})
+
+	entries = frappe.db.sql(
+		f"""
+		select
+			name as gl_entry, posting_date, account, debit, credit,
+			debit_in_account_currency, credit_in_account_currency,
+			voucher_type, voucher_no, cost_center, project,
+			against, party_type, party, account_currency, is_opening, creation, remarks
+		from `tabGL Entry`
+		where company = %(company)s
+			and posting_date between %(from_date)s and %(to_date)s
+			and is_cancelled = 0
+			{get_period_closing_condition(filters)}
+			and ifnull(is_opening, '') != 'Yes'
+			{conditions}
+		order by posting_date, voucher_type, voucher_no, name
+		""",
+		values,
+		as_dict=True,
+	)
+
+	grouped = {}
+	for entry in entries:
+		grouped.setdefault((entry.voucher_type, entry.voucher_no), []).append(entry)
+
+	return {
+		voucher: voucher_entries
+		for voucher, voucher_entries in grouped.items()
+		if is_direct_loan_supplier_settlement(voucher_entries, account_map)
+	}
+
+
+def is_direct_loan_supplier_settlement(entries, account_map):
+	return get_direct_loan_supplier_non_cash_amount(entries, account_map) > 0
+
+
+def get_direct_loan_supplier_non_cash_amount(entries, account_map):
+	loan_credit = 0
+	loan_debit = 0
+	supplier_debit = 0
+	supplier_credit = 0
+	cash_debit = 0
+	cash_credit = 0
+
+	for entry in entries:
+		account_number = get_account_number(entry.account, account_map)
+		amount = flt(entry.debit) - flt(entry.credit)
+		if startswith_any(account_number, CASH_PREFIXES):
+			if amount > 0:
+				cash_debit += amount
+			elif amount < 0:
+				cash_credit += abs(amount)
+		elif startswith_any(account_number, ("341", "343")):
+			if amount < 0:
+				loan_credit += abs(amount)
+			elif amount > 0:
+				loan_debit += amount
+		elif startswith_any(account_number, ("331", "3318", "1411", "1413")):
+			if amount > 0:
+				supplier_debit += amount
+			elif amount < 0:
+				supplier_credit += abs(amount)
+
+	loan_net_credit = max(loan_credit - loan_debit, 0)
+	supplier_net_debit = max(supplier_debit - supplier_credit, 0)
+	cash_outflow = max(cash_credit - cash_debit, 0)
+	cash_inflow = max(cash_debit - cash_credit, 0)
+	non_cash_base = min(loan_net_credit, supplier_net_debit)
+
+	if cash_outflow:
+		non_cash_base = max(non_cash_base - cash_outflow, 0)
+	elif cash_inflow and loan_net_credit > supplier_net_debit:
+		non_cash_base = min(non_cash_base, supplier_net_debit)
+
+	return flt(non_cash_base)
 
 
 def get_cash_flow_details_by_code(filters, period, account_map, cash_accounts, cash_flow_code=None):

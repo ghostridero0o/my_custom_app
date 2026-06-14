@@ -62,6 +62,7 @@ const BCLC_DRILLDOWN_CODES = new Set([
 	"34",
 	"35",
 	"36",
+	"80",
 ]);
 
 function is_bclc_drillable(data, column) {
@@ -94,7 +95,6 @@ function get_bclc_gl_route_options(data, period) {
 		finance_book: report.get_filter_value("finance_book"),
 		from_date: period.from_date,
 		to_date: period.to_date,
-		account: get_bclc_accounts(data, period),
 		cash_flow_code: data.code,
 		categorize_by: "Categorize by Voucher (Consolidated)",
 		include_dimensions: 1,
@@ -102,6 +102,9 @@ function get_bclc_gl_route_options(data, period) {
 		include_period_closing_voucher: report.get_filter_value("include_period_closing_voucher") ? 1 : 0,
 		show_remarks: 1,
 	};
+	if (data.code !== "80") {
+		route_options.account = get_bclc_accounts(data, period);
+	}
 
 	for (const filter of report.filters || []) {
 		const fieldname = filter.df && filter.df.fieldname;
