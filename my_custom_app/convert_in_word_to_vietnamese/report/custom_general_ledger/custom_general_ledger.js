@@ -223,6 +223,12 @@ frappe.query_reports["Custom General Ledger"] = {
 			fieldtype: "Data",
 			hidden: 1,
 		},
+		{
+			fieldname: "include_period_closing_voucher",
+			label: __("Include Period Closing Voucher"),
+			fieldtype: "Check",
+			hidden: 1,
+		},
 	],
 };
 

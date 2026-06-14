@@ -34,6 +34,13 @@ frappe.query_reports["BCLC-TT-TT99-TT"]["filters"].push({
 	default: 1,
 });
 
+frappe.query_reports["BCLC-TT-TT99-TT"]["filters"].push({
+	fieldname: "include_period_closing_voucher",
+	label: __("Include Period Closing Voucher"),
+	fieldtype: "Check",
+	default: 0,
+});
+
 const BCLC_DRILLDOWN_CODES = new Set([
 	"01",
 	"02",
@@ -92,6 +99,7 @@ function get_bclc_gl_route_options(data, period) {
 		categorize_by: "Categorize by Voucher (Consolidated)",
 		include_dimensions: 1,
 		include_default_book_entries: report.get_filter_value("include_default_book_entries") ? 1 : 0,
+		include_period_closing_voucher: report.get_filter_value("include_period_closing_voucher") ? 1 : 0,
 		show_remarks: 1,
 	};
 

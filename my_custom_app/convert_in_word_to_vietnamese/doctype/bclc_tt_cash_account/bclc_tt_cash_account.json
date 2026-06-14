@@ -1,0 +1,61 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "creation": "2026-06-14 00:00:00",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "enabled",
+  "company",
+  "account",
+  "account_prefix",
+  "description"
+ ],
+ "fields": [
+  {
+   "default": "1",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Enabled"
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Company",
+   "options": "Company"
+  },
+  {
+   "fieldname": "account",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Account",
+   "options": "Account"
+  },
+  {
+   "description": "Ví dụ: 111, 112, 113. Nếu chọn account group thì report tự lấy toàn bộ account con.",
+   "fieldname": "account_prefix",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Account Prefix"
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Small Text",
+   "label": "Description"
+  }
+ ],
+ "istable": 1,
+ "links": [],
+ "modified": "2026-06-14 00:00:00",
+ "modified_by": "Administrator",
+ "module": "convert In word to Vietnamese",
+ "name": "BCLC TT Cash Account",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

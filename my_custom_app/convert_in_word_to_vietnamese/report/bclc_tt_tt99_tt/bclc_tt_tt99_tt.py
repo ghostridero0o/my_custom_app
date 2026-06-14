@@ -10,6 +10,33 @@ from erpnext.accounts.report.financial_statements import get_cost_centers_with_c
 
 
 CASH_PREFIXES = ("111", "112", "113")
+SETTINGS_DOCTYPE = "BCLC TT Settings"
+
+DEFAULT_MAPPING_RULES = [
+	{"code": "21", "direction": "outflow", "prefixes": ("211", "212", "213", "217", "241", "242", "3318", "1413"), "priority": 10},
+	{"code": "22", "direction": "inflow", "prefixes": ("211", "212", "213", "217", "241", "242", "3318", "1413"), "priority": 10},
+	{"code": "23", "direction": "outflow", "prefixes": ("128",), "priority": 12},
+	{"code": "24", "direction": "inflow", "prefixes": ("128",), "priority": 12},
+	{"code": "25", "direction": "outflow", "prefixes": ("221", "222", "228"), "priority": 13},
+	{"code": "26", "direction": "inflow", "prefixes": ("221", "222", "228"), "priority": 13},
+	{"code": "27", "direction": "inflow", "prefixes": ("515", "1388"), "priority": 14},
+	{"code": "31", "direction": "inflow", "prefixes": ("411", "419"), "priority": 20},
+	{"code": "32", "direction": "outflow", "prefixes": ("411", "419"), "priority": 20},
+	{"code": "33", "direction": "inflow", "prefixes": ("341", "343"), "priority": 21},
+	{"code": "34", "direction": "outflow", "prefixes": ("341", "343"), "exclude_prefixes": ("3412",), "priority": 21},
+	{"code": "35", "direction": "outflow", "prefixes": ("3412",), "priority": 21},
+	{"code": "36", "direction": "outflow", "prefixes": ("421",), "priority": 22},
+	{"code": "01", "direction": "inflow", "prefixes": ("131", "511", "512", "515", "121", "3387", "3389"), "priority": 30},
+	{"code": "01", "direction": "outflow", "prefixes": ("131", "3389"), "priority": 30},
+	{"code": "02", "direction": "inflow", "prefixes": ("331", "1411"), "priority": 30},
+	{"code": "02", "direction": "outflow", "prefixes": ("331", "1411", "151", "152", "153", "154", "155", "156", "157", "158", "611", "621", "622", "623", "627", "628", "631", "641", "642", "133"), "priority": 30},
+	{"code": "03", "direction": "inflow", "prefixes": ("1410",), "priority": 31},
+	{"code": "03", "direction": "outflow", "prefixes": ("334", "1410"), "priority": 31},
+	{"code": "04", "direction": "outflow", "prefixes": ("335", "635"), "priority": 31},
+	{"code": "05", "direction": "outflow", "prefixes": ("3334", "821"), "priority": 31},
+	{"code": "06", "direction": "inflow", "prefixes": ("711", "1412", "244", "138", "1383", "333"), "priority": 40},
+	{"code": "07", "direction": "outflow", "prefixes": ("811", "1412", "244", "338", "344", "352", "353", "356", "333"), "exclude_prefixes": ("3334",), "priority": 40},
+]
 
 ROWS = [
 	{"label": "I. Lưu chuyển tiền từ hoạt động kinh doanh", "section": 1},
@@ -174,7 +201,13 @@ def get_period_values(filters, period_list, account_map, cash_accounts):
 			if row.get("total"):
 				values[row["code"]][period_key] = flt(sum(values[code][period_key] for code in row["total"]))
 
-		opening = get_cash_balance(filters, period["from_date"], cash_accounts, before_date=True)
+		opening = get_cash_balance(
+			filters,
+			period["from_date"],
+			cash_accounts,
+			before_date=True,
+			period_end_date=period["to_date"],
+		)
 		closing = get_cash_balance(filters, period["to_date"], cash_accounts)
 		net_change = values["50"][period_key]
 
@@ -263,26 +296,25 @@ def get_cash_flow_details_by_code(filters, period, account_map, cash_accounts, c
 	details = []
 	voucher_entries = get_cash_voucher_entries(filters, period, cash_accounts)
 	account_filter = get_list_filter(filters.get("account"))
+	rules = get_cash_flow_mapping_rules()
 
 	for entries in voucher_entries.values():
 		all_cash_entries = [entry for entry in entries if entry.account in cash_accounts]
 		non_cash_entries = [entry for entry in entries if entry.account not in cash_accounts]
+		external_cash_entries = get_external_cash_entries(all_cash_entries)
 
-		if not non_cash_entries:
-			continue
-
-		cash_entries = all_cash_entries
+		cash_entries = external_cash_entries
 		if account_filter:
 			cash_entries = [entry for entry in cash_entries if entry.account in account_filter]
-		net_cash_movement = flt(sum(flt(entry.debit) - flt(entry.credit) for entry in cash_entries))
+		net_cash_movement = flt(sum(flt(entry.cash_amount) for entry in cash_entries))
 
 		for cash_entry in cash_entries:
-			cash_amount = flt(cash_entry.debit) - flt(cash_entry.credit)
+			cash_amount = flt(cash_entry.cash_amount)
 			if not cash_amount:
 				continue
 
 			direction = "inflow" if cash_amount > 0 else "outflow"
-			counter_entries = get_counter_entries(cash_amount, non_cash_entries)
+			counter_entries = get_counter_entries(cash_amount, non_cash_entries, entries, account_map)
 			allocated = allocate_cash_amount(abs(cash_amount), counter_entries)
 
 			if not allocated:
@@ -298,7 +330,7 @@ def get_cash_flow_details_by_code(filters, period, account_map, cash_accounts, c
 				continue
 
 			for counter_entry, amount in allocated:
-				code = classify_cash_flow(direction, get_account_number(counter_entry.account, account_map))
+				code = classify_cash_flow(direction, counter_entry, account_map, entries, rules)
 				if not code:
 					continue
 				if cash_flow_code and code != cash_flow_code:
@@ -308,6 +340,38 @@ def get_cash_flow_details_by_code(filters, period, account_map, cash_accounts, c
 				)
 
 	return details
+
+
+def get_external_cash_entries(cash_entries):
+	cash_debit = sum(max(flt(entry.debit) - flt(entry.credit), 0) for entry in cash_entries)
+	cash_credit = sum(max(flt(entry.credit) - flt(entry.debit), 0) for entry in cash_entries)
+	internal_cash_amount = min(cash_debit, cash_credit)
+	debit_transfer_remaining = internal_cash_amount
+	credit_transfer_remaining = internal_cash_amount
+	external_entries = []
+
+	for entry in cash_entries:
+		cash_amount = flt(entry.debit) - flt(entry.credit)
+		if cash_amount > 0:
+			deducted = min(cash_amount, debit_transfer_remaining)
+			debit_transfer_remaining = flt(debit_transfer_remaining - deducted)
+			external_amount = flt(cash_amount - deducted)
+		elif cash_amount < 0:
+			outflow_amount = abs(cash_amount)
+			deducted = min(outflow_amount, credit_transfer_remaining)
+			credit_transfer_remaining = flt(credit_transfer_remaining - deducted)
+			external_amount = flt(-(outflow_amount - deducted))
+		else:
+			external_amount = 0
+
+		if not external_amount:
+			continue
+
+		external_entry = frappe._dict(entry.copy())
+		external_entry.cash_amount = external_amount
+		external_entries.append(external_entry)
+
+	return external_entries
 
 
 def make_cash_flow_detail_row(cash_entry, counter_entry, code, direction, amount, account_map):
@@ -355,7 +419,7 @@ def get_cash_voucher_entries(filters, period, cash_accounts):
 		where company = %(company)s
 			and posting_date between %(from_date)s and %(to_date)s
 			and is_cancelled = 0
-			and voucher_type != 'Period Closing Voucher'
+			{get_period_closing_condition(filters)}
 			and ifnull(is_opening, '') != 'Yes'
 			and account in %(cash_accounts)s
 			{conditions}
@@ -382,7 +446,7 @@ def get_cash_voucher_entries(filters, period, cash_accounts):
 		where company = %(company)s
 			and posting_date between %(from_date)s and %(to_date)s
 			and is_cancelled = 0
-			and voucher_type != 'Period Closing Voucher'
+			{get_period_closing_condition(filters)}
 			and voucher_no in %(voucher_nos)s
 		order by posting_date, voucher_type, voucher_no, name
 		""",
@@ -446,13 +510,47 @@ def get_list_filter(value):
 	return value
 
 
-def get_counter_entries(cash_amount, non_cash_entries):
+def get_counter_entries(cash_amount, non_cash_entries, voucher_entries=None, account_map=None):
 	if cash_amount > 0:
 		counter_entries = [entry for entry in non_cash_entries if flt(entry.credit) > flt(entry.debit)]
 	else:
 		counter_entries = [entry for entry in non_cash_entries if flt(entry.debit) > flt(entry.credit)]
 
-	return counter_entries or non_cash_entries
+	counter_entries = counter_entries or non_cash_entries
+	return get_effective_counter_entries(counter_entries, voucher_entries or [], account_map or {})
+
+
+def get_effective_counter_entries(counter_entries, voucher_entries, account_map):
+	if not counter_entries:
+		return []
+
+	voucher_type = cstr(voucher_entries[0].voucher_type) if voucher_entries else ""
+	if voucher_type != "Expense Claim":
+		return counter_entries
+
+	non_payable_entries = [
+		entry for entry in counter_entries if not is_payable_clearing_entry(entry, voucher_entries, account_map)
+	]
+	return non_payable_entries or counter_entries
+
+
+def is_payable_clearing_entry(entry, voucher_entries, account_map):
+	if is_self_clearing_account(entry, voucher_entries):
+		return True
+
+	account_number = get_account_number(entry.account, account_map)
+	if startswith_any(account_number, ("334", "335", "336", "338")):
+		return True
+
+	account_type = frappe.get_cached_value("Account", entry.account, "account_type")
+	return account_type == "Payable"
+
+
+def is_self_clearing_account(entry, voucher_entries):
+	account_entries = [row for row in voucher_entries if row.account == entry.account]
+	has_debit = any(flt(row.debit) > flt(row.credit) for row in account_entries)
+	has_credit = any(flt(row.credit) > flt(row.debit) for row in account_entries)
+	return has_debit and has_credit
 
 
 def allocate_cash_amount(cash_amount, counter_entries):
@@ -479,58 +577,91 @@ def allocate_cash_amount(cash_amount, counter_entries):
 	return allocated
 
 
-def classify_cash_flow(direction, account_number):
-	if direction == "inflow":
-		return classify_inflow(account_number)
+def classify_cash_flow(direction, counter_entry, account_map, voucher_entries, rules):
+	account_number = get_account_number(counter_entry.account, account_map)
+	for rule in rules:
+		if rule.direction != direction:
+			continue
+		if rule.accounts and counter_entry.account not in rule.accounts:
+			continue
+		if rule.prefixes and not startswith_any(account_number, rule.prefixes):
+			continue
+		if rule.exclude_prefixes and startswith_any(account_number, rule.exclude_prefixes):
+			continue
+		if rule.keywords and not has_voucher_keywords(rule.keywords, counter_entry, voucher_entries):
+			continue
+		return rule.code
 
-	return classify_outflow(account_number)
-
-
-def classify_inflow(account_number):
-	if startswith_any(account_number, ("411", "419")):
-		return "31"
-	if startswith_any(account_number, ("341", "343")):
-		return "33"
-	if startswith_any(account_number, ("211", "212", "213", "217", "214", "241", "242")):
-		return "22"
-	if startswith_any(account_number, ("128",)):
-		return "24"
-	if startswith_any(account_number, ("221", "222", "228")):
-		return "26"
-	if startswith_any(account_number, ("515", "1388")):
-		return "27"
-	if startswith_any(account_number, ("131", "511", "512", "3331", "3387")):
-		return "01"
-
-	return "06"
+	return "06" if direction == "inflow" else "07"
 
 
-def classify_outflow(account_number):
-	if startswith_any(account_number, ("411", "419")):
-		return "32"
-	if startswith_any(account_number, ("341", "343")):
-		return "35" if startswith_any(account_number, ("3412",)) else "34"
-	if startswith_any(account_number, ("421",)):
-		return "36"
-	if startswith_any(account_number, ("211", "212", "213", "217", "214", "241", "242")):
-		return "21"
-	if startswith_any(account_number, ("128",)):
-		return "23"
-	if startswith_any(account_number, ("221", "222", "228")):
-		return "25"
-	if startswith_any(account_number, ("334",)):
-		return "03"
-	if startswith_any(account_number, ("335", "635")):
-		return "04"
-	if startswith_any(account_number, ("3334",)):
-		return "05"
-	if startswith_any(account_number, ("331", "133", "151", "152", "153", "154", "155", "156", "157", "158", "611", "621", "622", "623", "627")):
-		return "02"
+def get_cash_flow_mapping_rules():
+	custom_rules = get_custom_cash_flow_mapping_rules()
+	if custom_rules:
+		return custom_rules
 
-	return "07"
+	return [
+		frappe._dict(
+			{
+				"code": rule["code"],
+				"direction": rule["direction"],
+				"accounts": tuple(rule.get("accounts") or ()),
+				"prefixes": tuple(rule.get("prefixes") or ()),
+				"exclude_prefixes": tuple(rule.get("exclude_prefixes") or ()),
+				"keywords": tuple(rule.get("keywords") or ()),
+				"priority": rule.get("priority", 100),
+			}
+		)
+		for rule in sorted(DEFAULT_MAPPING_RULES, key=lambda row: row.get("priority", 100))
+	]
 
 
-def get_cash_balance(filters, date, cash_accounts, before_date=False):
+def get_custom_cash_flow_mapping_rules():
+	if not is_bclc_settings_available():
+		return []
+
+	settings = frappe.get_single(SETTINGS_DOCTYPE)
+	if not settings.enabled or not settings.enable_custom_mapping:
+		return []
+
+	rules = []
+	for row in settings.account_rules:
+		if not row.enabled:
+			continue
+
+		direction = "inflow" if row.direction == "Inflow" else "outflow"
+		rules.append(
+			frappe._dict(
+				{
+					"code": row.cash_flow_code,
+					"direction": direction,
+					"accounts": tuple([row.account] if row.account else []),
+					"prefixes": tuple(split_csv(row.account_prefix)),
+					"exclude_prefixes": tuple(split_csv(row.exclude_account_prefix)),
+					"keywords": tuple(split_csv(row.voucher_keywords)),
+					"priority": row.priority or 100,
+				}
+			)
+		)
+
+	return sorted(rules, key=lambda row: row.priority)
+
+
+def has_voucher_keywords(keywords, counter_entry, voucher_entries):
+	text_parts = [
+		counter_entry.get("voucher_type"),
+		counter_entry.get("voucher_no"),
+		counter_entry.get("remarks"),
+		counter_entry.get("against"),
+	]
+	for entry in voucher_entries:
+		text_parts.extend([entry.get("account"), entry.get("remarks"), entry.get("against")])
+
+	text = " ".join(cstr(part).lower() for part in text_parts if part)
+	return any(cstr(keyword).lower() in text for keyword in keywords)
+
+
+def get_cash_balance(filters, date, cash_accounts, before_date=False, period_end_date=None):
 	conditions, values = get_common_conditions(filters)
 	values["date"] = getdate(date)
 	values["cash_accounts"] = list(cash_accounts)
@@ -539,7 +670,11 @@ def get_cash_balance(filters, date, cash_accounts, before_date=False):
 		return 0
 
 	if before_date:
-		date_condition = "(posting_date < %(date)s or (posting_date = %(date)s and ifnull(is_opening, '') = 'Yes'))"
+		values["period_end_date"] = getdate(period_end_date or date)
+		date_condition = """(
+			posting_date < %(date)s
+			or (ifnull(is_opening, '') = 'Yes' and posting_date <= %(period_end_date)s)
+		)"""
 	else:
 		date_condition = "posting_date <= %(date)s"
 
@@ -550,6 +685,7 @@ def get_cash_balance(filters, date, cash_accounts, before_date=False):
 		where company = %(company)s
 			and {date_condition}
 			and is_cancelled = 0
+			{get_period_closing_condition(filters)}
 			and account in %(cash_accounts)s
 			{conditions}
 		""",
@@ -557,6 +693,13 @@ def get_cash_balance(filters, date, cash_accounts, before_date=False):
 	)[0][0]
 
 	return flt(balance)
+
+
+def get_period_closing_condition(filters):
+	if filters.get("include_period_closing_voucher"):
+		return ""
+
+	return "and voucher_type != 'Period Closing Voucher'"
 
 
 def get_account_map(company):
@@ -575,6 +718,10 @@ def get_cash_accounts(company, account_map):
 		fields=["name", "account_number", "is_group", "lft", "rgt"],
 		order_by="lft",
 	)
+	custom_cash_accounts = get_custom_cash_accounts(company, accounts, account_map)
+	if custom_cash_accounts:
+		return custom_cash_accounts
+
 	cash_roots = [
 		account
 		for account in accounts
@@ -594,6 +741,53 @@ def get_cash_accounts(company, account_map):
 	return cash_accounts
 
 
+def get_custom_cash_accounts(company, accounts, account_map):
+	if not is_bclc_settings_available():
+		return set()
+
+	settings = frappe.get_single(SETTINGS_DOCTYPE)
+	if not settings.enabled:
+		return set()
+
+	configured_rows = [
+		row
+		for row in settings.cash_accounts
+		if row.enabled and (not row.company or row.company == company) and (row.account or row.account_prefix)
+	]
+	if not configured_rows:
+		return set()
+
+	accounts_by_name = {account.name: account for account in accounts}
+	cash_accounts = set()
+
+	for row in configured_rows:
+		if row.account:
+			account = accounts_by_name.get(row.account)
+			if not account:
+				continue
+			if account.is_group:
+				cash_accounts.update(get_leaf_accounts_inside(account, accounts))
+			else:
+				cash_accounts.add(account.name)
+
+		for prefix in split_csv(row.account_prefix):
+			for account in accounts:
+				if account.is_group:
+					continue
+				if startswith_any(get_account_number(account.name, account_map), (prefix,)):
+					cash_accounts.add(account.name)
+
+	return cash_accounts
+
+
+def get_leaf_accounts_inside(root, accounts):
+	return {
+		account.name
+		for account in accounts
+		if not account.is_group and account.lft >= root.lft and account.rgt <= root.rgt
+	}
+
+
 def get_account_number(account, account_map):
 	return account_map.get(account) or cstr(account).split(" - ")[0].replace(".", "").replace(" ", "")
 
@@ -604,6 +798,20 @@ def is_cash_account(account, account_map):
 
 def startswith_any(value, prefixes):
 	return any(cstr(value).startswith(prefix) for prefix in prefixes)
+
+
+def split_csv(value):
+	if not value:
+		return []
+
+	return [item.strip() for item in cstr(value).replace("\n", ",").split(",") if item.strip()]
+
+
+def is_bclc_settings_available():
+	try:
+		return frappe.db.exists("DocType", SETTINGS_DOCTYPE)
+	except Exception:
+		return False
 
 
 def get_report_summary(period_list, period_values, currency):

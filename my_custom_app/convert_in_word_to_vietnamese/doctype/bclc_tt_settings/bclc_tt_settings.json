@@ -1,0 +1,87 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "creation": "2026-06-14 00:00:00",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "enabled",
+  "enable_custom_mapping",
+  "cash_section",
+  "cash_accounts",
+  "rules_section",
+  "account_rules"
+ ],
+ "fields": [
+  {
+   "default": "1",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Enabled"
+  },
+  {
+   "default": "1",
+   "description": "Nếu bật, report ưu tiên bảng cấu hình bên dưới. Nếu tắt hoặc không có dòng rule, report dùng mapping mặc định trong code.",
+   "fieldname": "enable_custom_mapping",
+   "fieldtype": "Check",
+   "label": "Enable Custom Mapping"
+  },
+  {
+   "fieldname": "cash_section",
+   "fieldtype": "Section Break",
+   "label": "Cash Accounts"
+  },
+  {
+   "description": "Khai báo tài khoản tiền hoặc prefix tài khoản tiền. Nếu để trống, report dùng mặc định 111, 112, 113 và tự lấy toàn bộ tài khoản con.",
+   "fieldname": "cash_accounts",
+   "fieldtype": "Table",
+   "label": "Cash Accounts",
+   "options": "BCLC TT Cash Account"
+  },
+  {
+   "fieldname": "rules_section",
+   "fieldtype": "Section Break",
+   "label": "Cash Flow Mapping Rules"
+  },
+  {
+   "description": "Khai báo account/prefix theo từng mã BCLC. Priority nhỏ hơn được ưu tiên trước.",
+   "fieldname": "account_rules",
+   "fieldtype": "Table",
+   "label": "Account Rules",
+   "options": "BCLC TT Account Rule"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-06-14 00:00:00",
+ "modified_by": "Administrator",
+ "module": "convert In word to Vietnamese",
+ "name": "BCLC TT Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "Accounts Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
