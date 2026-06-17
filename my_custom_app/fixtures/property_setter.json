@@ -1,6 +1,22 @@
 [
  {
   "default_value": null,
+  "doc_type": "Sales Order Item",
+  "docstatus": 0,
+  "doctype": "Property Setter",
+  "doctype_or_field": "DocField",
+  "field_name": "warehouse",
+  "is_system_generated": 0,
+  "modified": "2026-04-14 15:29:35.730881",
+  "module": "convert In word to Vietnamese",
+  "name": "Sales Order Item-warehouse-allow_on_submit",
+  "property": "allow_on_submit",
+  "property_type": "check",
+  "row_name": null,
+  "value": "1"
+ },
+ {
+  "default_value": null,
   "doc_type": "Attendance",
   "docstatus": 0,
   "doctype": "Property Setter",
