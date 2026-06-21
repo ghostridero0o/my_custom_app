@@ -224,6 +224,12 @@ frappe.query_reports["Custom General Ledger"] = {
 			hidden: 1,
 		},
 		{
+			fieldname: "bclc_gt_code",
+			label: __("BCLC GT Code"),
+			fieldtype: "Data",
+			hidden: 1,
+		},
+		{
 			fieldname: "include_period_closing_voucher",
 			label: __("Include Period Closing Voucher"),
 			fieldtype: "Check",

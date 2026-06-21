@@ -143,7 +143,13 @@ def get_result(filters, account_details):
 	if filters.get("include_dimensions"):
 		accounting_dimensions = get_accounting_dimensions()
 
-	if filters.get("cash_flow_code"):
+	if filters.get("bclc_gt_code") in ("04", "14", "16", "17", "31", "32", "33", "34", "35"):
+		from my_custom_app.convert_in_word_to_vietnamese.report.bclc_tt_tt99_gt.bclc_tt_tt99_gt import (
+			get_bclc_gt_detail_entries,
+		)
+
+		gl_entries = get_bclc_gt_detail_entries(filters)
+	elif filters.get("cash_flow_code"):
 		from my_custom_app.convert_in_word_to_vietnamese.report.bclc_tt_tt99_tt.bclc_tt_tt99_tt import (
 			get_cash_flow_detail_entries,
 		)
