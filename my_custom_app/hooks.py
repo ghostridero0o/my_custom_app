@@ -279,8 +279,6 @@ fixtures = [
 
 	{"dt": "Property Setter", "filters": [["module", "=","convert In word to Vietnamese"]]},
 
-	{"dt": "DocType", "filters": [["module", "=","convert In word to Vietnamese"]]},
-
     {"dt": "Client Script", "filters": [["module", "=","convert In word to Vietnamese"]]},
 
     {"dt": "Server Script", "filters": [["module", "=","convert In word to Vietnamese"]]}
