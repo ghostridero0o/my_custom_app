@@ -350,5 +350,27 @@
   "name": "Update remarks SI",
   "script": "frappe.ui.form.on('Sales Invoice', {\n    onload: function(frm) {\n        if (frm.doc.customer_name) {\n            frm.set_value('remarks', `Bán hàng cho ${frm.doc.customer_name}`);\n        }\n    },\n    customer: function(frm) {\n        if (frm.doc.customer_name) {\n            frm.set_value('remarks', `Bán hàng cho ${frm.doc.customer_name}`);\n        }\n    }\n});\n",
   "view": "Form"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Client Script",
+  "dt": "Payment Entry",
+  "enabled": 1,
+  "modified": "2026-07-12 20:25:24.263973",
+  "module": "convert In word to Vietnamese",
+  "name": "Lời nhắc payment entry",
+  "script": "frappe.ui.form.on(\"Payment Entry\", {\n\tbefore_submit(frm) {\n\t\tconst missing_fields = [];\n\n\t\tif (!frm.doc.project) {\n\t\t\tmissing_fields.push(__(\"Project\"));\n\t\t}\n\n\t\tif (!frm.doc.cost_center) {\n\t\t\tmissing_fields.push(__(\"Cost Center\"));\n\t\t}\n\n\t\tif (!missing_fields.length) {\n\t\t\treturn;\n\t\t}\n\n\t\treturn new Promise((resolve) => {\n\t\t\tlet continue_submit = false;\n\t\t\tconst message = __(\n\t\t\t\t\"Payment Entry này chưa nhập {0}. Bạn có muốn tiếp tục submit không?\",\n\t\t\t\t[frappe.utils.comma_and(missing_fields)]\n\t\t\t);\n\n\t\t\tconst dialog = new frappe.ui.Dialog({\n\t\t\t\ttitle: __(\"Thiếu thông tin\"),\n\t\t\t\tindicator: \"orange\",\n\t\t\t\tprimary_action_label: __(\"Tiếp tục Submit\"),\n\t\t\t\tprimary_action: () => {\n\t\t\t\t\tcontinue_submit = true;\n\t\t\t\t\tdialog.hide();\n\t\t\t\t},\n\t\t\t\tsecondary_action_label: __(\"Hủy Submit\"),\n\t\t\t\tsecondary_action: () => {\n\t\t\t\t\tfrappe.validated = false;\n\t\t\t\t\tdialog.hide();\n\t\t\t\t},\n\t\t\t});\n\n\t\t\tdialog.$body.append(`<p class=\"frappe-confirm-message\">${message}</p>`);\n\t\t\tdialog.onhide = () => {\n\t\t\t\tif (!continue_submit) {\n\t\t\t\t\tfrappe.validated = false;\n\t\t\t\t}\n\t\t\t\tresolve();\n\t\t\t};\n\t\t\tdialog.show();\n\t\t});\n\t},\n});",
+  "view": "Form"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Client Script",
+  "dt": "Journal Entry",
+  "enabled": 1,
+  "modified": "2026-07-12 20:25:16.897785",
+  "module": "convert In word to Vietnamese",
+  "name": "Lời nhắc Journal Entry",
+  "script": "frappe.ui.form.on(\"Journal Entry\", {\n\tbefore_submit(frm) {\n\t\tconst missing_rows = (frm.doc.accounts || [])\n\t\t\t.map((row) => {\n\t\t\t\tconst missing_fields = [];\n\n\t\t\t\tif (!row.project) {\n\t\t\t\t\tmissing_fields.push(__(\"Project\"));\n\t\t\t\t}\n\n\t\t\t\tif (!row.cost_center) {\n\t\t\t\t\tmissing_fields.push(__(\"Cost Center\"));\n\t\t\t\t}\n\n\t\t\t\treturn missing_fields.length\n\t\t\t\t\t? __(\"Dòng #{0}: thiếu {1}\", [row.idx, frappe.utils.comma_and(missing_fields)])\n\t\t\t\t\t: null;\n\t\t\t})\n\t\t\t.filter(Boolean);\n\n\t\tif (!missing_rows.length) {\n\t\t\treturn;\n\t\t}\n\n\t\treturn new Promise((resolve) => {\n\t\t\tlet continue_submit = false;\n\t\t\tconst message = __(\n\t\t\t\t\"Journal Entry này có dòng trong bảng Accounts chưa nhập Project hoặc Cost Center. Bạn có muốn tiếp tục submit không?\"\n\t\t\t);\n\n\t\t\tconst dialog = new frappe.ui.Dialog({\n\t\t\t\ttitle: __(\"Thiếu thông tin\"),\n\t\t\t\tindicator: \"orange\",\n\t\t\t\tprimary_action_label: __(\"Tiếp tục Submit\"),\n\t\t\t\tprimary_action: () => {\n\t\t\t\t\tcontinue_submit = true;\n\t\t\t\t\tdialog.hide();\n\t\t\t\t},\n\t\t\t\tsecondary_action_label: __(\"Hủy Submit\"),\n\t\t\t\tsecondary_action: () => {\n\t\t\t\t\tfrappe.validated = false;\n\t\t\t\t\tdialog.hide();\n\t\t\t\t},\n\t\t\t});\n\n\t\t\tdialog.$body.append(\n\t\t\t\t`<div class=\"frappe-confirm-message\">\n\t\t\t\t\t<p>${message}</p>\n\t\t\t\t\t<ul>${missing_rows.map((row) => `<li>${row}</li>`).join(\"\")}</ul>\n\t\t\t\t</div>`\n\t\t\t);\n\n\t\t\tdialog.onhide = () => {\n\t\t\t\tif (!continue_submit) {\n\t\t\t\t\tfrappe.validated = false;\n\t\t\t\t}\n\t\t\t\tresolve();\n\t\t\t};\n\n\t\t\tdialog.show();\n\t\t});\n\t},\n});",
+  "view": "Form"
  }
 ]
