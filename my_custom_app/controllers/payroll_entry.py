@@ -21,38 +21,45 @@ from erpnext.accounts.doctype.accounting_dimension.accounting_dimension import (
 )
 
 
+@frappe.whitelist()
+def calculate_present_days(employee, start_date, end_date):
+	"""Calculate present days using the same daily attendance rules as the monthly attendance report."""
+	attendance = frappe.get_all(
+		"Attendance",
+		filters={
+			"employee": employee,
+			"attendance_date": ("between", [start_date, end_date]),
+			"docstatus": 1,
+		},
+		fields=["attendance_date", "status", "leave_type", "leave_application"],
+		order_by="attendance_date",
+	)
+
+	paid_leave_types = set(frappe.get_all("Leave Type", filters={"is_lwp": 0}, pluck="name"))
+	attendance_by_date = {}
+	for row in attendance:
+		attendance_by_date.setdefault(row.attendance_date, []).append(row)
+
+	present_days = 0.0
+	for day_entries in attendance_by_date.values():
+		leave_entries = [row for row in day_entries if row.status == "On Leave"]
+		if leave_entries:
+			if any(
+				row.leave_application and row.leave_type in paid_leave_types for row in leave_entries
+			):
+				present_days += 1
+			continue
+
+		present_days += sum(1 for row in day_entries if row.status in ("Present", "Work From Home"))
+		# Every submitted Half Day is 0.5 day, regardless of leave_type.
+		present_days += sum(0.5 for row in day_entries if row.status == "Half Day")
+
+	return present_days
+
+
 class CustomPayrollEntry(PayrollEntry):
 	def _compute_present_days(self, employee):
-		attendance = frappe.get_all(
-			"Attendance",
-			filters={
-				"employee": employee,
-				"attendance_date": ("between", [self.start_date, self.end_date]),
-				"docstatus": 1,
-			},
-			fields=["status", "leave_type"],
-		)
-
-		present = sum(1 for row in attendance if row.status == "Present")
-		half_day = sum(1 for row in attendance if row.status == "Half Day")
-
-		leave_types = {row.leave_type for row in attendance if row.status == "On Leave" and row.leave_type}
-		paid_leave_types = set()
-		if leave_types:
-			paid_leave_types = {
-				lt.name
-				for lt in frappe.get_all(
-					"Leave Type", filters={"name": ("in", leave_types), "is_lwp": 0}, fields=["name"]
-				)
-			}
-
-		paid_leave_days = sum(
-			1
-			for row in attendance
-			if row.status == "On Leave" and row.leave_type and row.leave_type in paid_leave_types
-		)
-
-		return present + (half_day * 0.5) + paid_leave_days
+		return calculate_present_days(employee, self.start_date, self.end_date)
 
 	@frappe.whitelist()
 	def create_salary_slips(self):

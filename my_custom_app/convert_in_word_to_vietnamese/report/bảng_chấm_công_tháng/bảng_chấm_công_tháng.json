@@ -10,10 +10,10 @@
  "modified": "2017-02-24 20:16:50.550242", 
  "modified_by": "Administrator", 
  "module": "convert In word to Vietnamese", 
- "name": "Bang Cham Cong Thang", 
+ "name": "Bảng Chấm Công Tháng",
  "owner": "Administrator", 
  "ref_doctype": "Attendance", 
- "report_name": "Bang Cham Cong Thang", 
+ "report_name": "Bảng Chấm Công Tháng",
  "report_type": "Script Report", 
  "roles": [
   {

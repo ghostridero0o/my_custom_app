@@ -4,7 +4,6 @@
 
 from calendar import monthrange
 from itertools import groupby
-from datetime import datetime
 
 import frappe
 from frappe import _
@@ -15,10 +14,11 @@ from frappe.utils.nestedset import get_descendants_of
 Filters = frappe._dict
 
 status_map = {
-	"Present": "1",
-	"Absent": "N",
+	"Present": "X",
+	"Absent": "0",
 	"Half Day": "1/2",
 	"Work From Home": "WFH",
+	"Paid Leave": "N",
 	"On Leave": "N",
 	"Holiday": "Lễ",
 	"Weekly Off": "CN",
@@ -30,24 +30,15 @@ day_abbr = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 def execute(filters: Filters | None = None) -> tuple:
 	filters = frappe._dict(filters or {})
 
-	current_month = datetime.now().month
-	current_year = datetime.now().year
-	current_day = datetime.now().day
-
-	# Kiểm tra và thay thế giá trị filters.month, filters.year nếu không có
+	# The report always represents the complete selected month.
 	if not filters.month:
-		filters.month = current_month
+		filters.month = getdate().month
 
 	if not filters.year:
-		filters.year = current_year
-	
-	# Set start and end days based on current date
-	if current_day <= 15:
-		filters.start_day = 1
-		filters.end_day = 15
-	else:
-		filters.start_day = 16
-		filters.end_day = get_total_days_in_month(filters)
+		filters.year = getdate().year
+
+	filters.start_day = 1
+	filters.end_day = get_total_days_in_month(filters)
 
 	if not filters.company:
 		filters.company = frappe.defaults.get_user_default("Company")
@@ -77,16 +68,23 @@ def execute(filters: Filters | None = None) -> tuple:
 
 def get_message() -> str:
 	message = ""
-	colors = ["green", "red", "orange", "green", "#318AD8", "", ""]
+	colors = {
+		"Present": "green",
+		"Absent": "red",
+		"Half Day": "orange",
+		"Work From Home": "green",
+		"On Leave": "#318AD8",
+	}
 
-	count = 0
 	for status, abbr in status_map.items():
+		# Paid and unpaid leave share the same visual abbreviation.
+		if status == "Paid Leave":
+			continue
 		message += f"""
-			<span style='border-left: 2px solid {colors[count]}; padding-right: 12px; padding-left: 5px; margin-right: 3px;'>
+			<span style='border-left: 2px solid {colors.get(status, "")}; padding-right: 12px; padding-left: 5px; margin-right: 3px;'>
 				{status} - {abbr}
 			</span>
 		"""
-		count += 1
 
 	return message
 
@@ -162,8 +160,16 @@ def get_columns(filters: Filters) -> list[dict]:
 			]
 		)
 	else:
-		columns.append({"label": _("Shift"), "fieldname": "shift", "fieldtype": "Data", "width": 120})
 		columns.extend(get_columns_for_days(filters))
+		columns.append(
+			{
+				"label": _("Tổng ngày công"),
+				"fieldname": "total_workdays",
+				"fieldtype": "Float",
+				"precision": 1,
+				"width": 110,
+			}
+		)
 
 	return columns
 
@@ -237,12 +243,22 @@ def get_attendance_map(filters: Filters) -> dict:
 	}
 	"""
 	attendance_list = get_attendance_records(filters)
+	paid_leave_types = set(
+		frappe.get_all("Leave Type", filters={"is_lwp": 0}, pluck="name")
+	)
 	attendance_map = {}
 	leave_map = {}
 
 	for d in attendance_list:
 		if d.status == "On Leave":
-			leave_map.setdefault(d.employee, {}).setdefault(d.shift, []).append(d.day_of_month)
+			leave_status = (
+				"Paid Leave"
+				if d.leave_application and d.leave_type in paid_leave_types
+				else "On Leave"
+			)
+			leave_map.setdefault(d.employee, {}).setdefault(d.shift, []).append(
+				(d.day_of_month, leave_status)
+			)
 			continue
 
 		if d.shift is None:
@@ -253,14 +269,14 @@ def get_attendance_map(filters: Filters) -> dict:
 
 	# leave is applicable for the entire day so all shifts should show the leave entry
 	for employee, leave_days in leave_map.items():
-		for assigned_shift, days in leave_days.items():
+		for assigned_shift, day_statuses in leave_days.items():
 			# no attendance records exist except leaves
 			if employee not in attendance_map:
 				attendance_map.setdefault(employee, {}).setdefault(assigned_shift, {})
 
-			for day in days:
+			for day, leave_status in day_statuses:
 				for shift in attendance_map[employee].keys():
-					attendance_map[employee][shift][day] = "On Leave"
+					attendance_map[employee][shift][day] = leave_status
 
 	return attendance_map
 
@@ -274,6 +290,8 @@ def get_attendance_records(filters: Filters) -> list[dict]:
 			Extract("day", Attendance.attendance_date).as_("day_of_month"),
 			Attendance.status,
 			Attendance.shift,
+			Attendance.leave_type,
+			Attendance.leave_application,
 		)
 		.where(
 			(Attendance.docstatus == 1)
@@ -516,22 +534,47 @@ def get_attendance_summary_and_days(employee: str, filters: Filters) -> tuple[di
 def get_attendance_status_for_detailed_view(
 	employee: str, filters: Filters, employee_attendance: dict, holidays: list
 ) -> list[dict]:
-    attendance_values = []
+	row = {"total_workdays": 0.0}
 
-    for shift, status_dict in employee_attendance.items():
-        row = {"shift": shift}
+	for day in range(filters.start_day, filters.end_day + 1):
+		statuses = [status_by_day[day] for status_by_day in employee_attendance.values() if day in status_by_day]
+		day_workdays = sum(1 for status in statuses if status in ("Present", "Work From Home"))
+		day_workdays += sum(0.5 for status in statuses if status == "Half Day")
 
-        for day in range(filters.start_day, filters.end_day + 1):
-            status = status_dict.get(day)
-            if status is None and holidays:
-                status = get_holiday_status(day, holidays)
+		# A leave applies to the whole day and may be copied to every shift in the
+		# attendance map. Count it once only, regardless of the number of shifts.
+		if "Paid Leave" in statuses:
+			day_workdays += 1
 
-            abbr = status_map.get(status, "")
-            row[cstr(day)] = abbr
+		row["total_workdays"] += day_workdays
+		row[cstr(day)] = get_merged_attendance_abbr(day_workdays, statuses, day, holidays)
 
-        attendance_values.append(row)
+	return [row]
 
-    return attendance_values
+
+def get_merged_attendance_abbr(day_workdays: float, statuses: list[str], day: int, holidays: list) -> str:
+	if day_workdays:
+		# Keep paid leave identifiable when it is the only credited status.
+		if day_workdays == 1 and "Paid Leave" in statuses and not any(
+			status in ("Present", "Work From Home", "Half Day") for status in statuses
+		):
+			return status_map["Paid Leave"]
+
+		if day_workdays == 0.5:
+			return "1/2"
+		if day_workdays == 1:
+			return "X"
+		if day_workdays == 1.5:
+			return "3/2"
+		return cstr(day_workdays).removesuffix(".0")
+
+	if "On Leave" in statuses:
+		return status_map["On Leave"]
+	if "Absent" in statuses:
+		return status_map["Absent"]
+
+	holiday_status = get_holiday_status(day, holidays)
+	return status_map.get(holiday_status, "")
 
 
 def get_holiday_status(day: int, holidays: list) -> str:
@@ -573,6 +616,25 @@ def get_leave_summary(employee: str, filters: Filters) -> dict[str, float]:
 	for d in leave_details:
 		leave_type = frappe.scrub(d.leave_type)
 		leaves[leave_type] = d.leave_days
+
+	# "Làm nửa ca" represents the Half Day attendance status in this report.
+	# Some Half Day records are created without a leave_type, so calculate this
+	# column from status to keep the summarized and detailed views consistent.
+	half_day_leave_type = "Làm nửa ca"
+	if frappe.db.exists("Leave Type", half_day_leave_type):
+		half_day_count = (
+			frappe.qb.from_(Attendance)
+			.select(Count("*"))
+			.where(
+				(Attendance.employee == employee)
+				& (Attendance.docstatus == 1)
+				& (Attendance.company.isin(filters.companies))
+				& (Attendance.status == "Half Day")
+				& (Extract("month", Attendance.attendance_date) == filters.month)
+				& (Extract("year", Attendance.attendance_date) == filters.year)
+			)
+		).run()[0][0]
+		leaves[frappe.scrub(half_day_leave_type)] = half_day_count * 0.5
 
 	return leaves
 
@@ -635,7 +697,7 @@ def get_chart_data(attendance_map: dict, filters: Filters) -> dict:
 			for __, attendance in attendance_dict.items():
 				attendance_on_day = attendance.get(cint(day["fieldname"]))
 
-				if attendance_on_day == "On Leave":
+				if attendance_on_day in ("On Leave", "Paid Leave"):
 					# leave should be counted only once for the entire day
 					total_leaves_on_day += 1
 					break

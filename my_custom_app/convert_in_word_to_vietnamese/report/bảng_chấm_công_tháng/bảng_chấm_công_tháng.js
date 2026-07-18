@@ -1,7 +1,7 @@
 // Copyright (c) 2015, Frappe Technologies Pvt. Ltd. and Contributors
 // License: GNU General Public License v3. See license.txt
 
-frappe.query_reports["Bang Cham Cong Thang"] = {
+frappe.query_reports["Bảng Chấm Công Tháng"] = {
 	filters: [
 		{
 			fieldname: "month",
@@ -93,12 +93,13 @@ frappe.query_reports["Bang Cham Cong Thang"] = {
 		}
 
 		if (!summarized_view) {
-			if ((group_by && column.colIndex > 3) || (!group_by && column.colIndex > 2)) {
-				if (value == "1" || value == "WFH")
+			const is_day_column = /^\d+$/.test(column.fieldname || "");
+			if (is_day_column) {
+				if (["X", "WFH", "3/2", "2"].includes(value))
 					value = "<span style='color:green'>" + value + "</span>";
-				else if (value == "N") value = "<span style='color:red'>" + value + "</span>";
+				else if (value == "0") value = "<span style='color:red'>" + value + "</span>";
 				else if (value == "1/2") value = "<span style='color:orange'>" + value + "</span>";
-				else if (value == "L") value = "<span style='color:#318AD8'>" + value + "</span>";
+				else if (value == "N") value = "<span style='color:#318AD8'>" + value + "</span>";
 			}
 		}
 
