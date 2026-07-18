@@ -47,7 +47,7 @@ CF_INDIRECT_MAPPING = {
 	"ms02_depreciation": ["6234", "6274", "6414"],
 	"ms03_provision": ["352", "6426"],
 	"ms04_fx_unrealized": ["413", "515", "635"],
-	"ms05_investing_financial_gain_loss": ["515", "5117", "711", "7115", "715", "811", "6351"],
+	"ms05_investing_financial_gain_loss": ["515", "5117", "711", "7115", "811", "6351"],
 	"ms06_borrowing_cost": ["6352"],
 	"ms07_other_adjustment": ["356"],
 	"ms09_receivables": ["131", "136", "138", "1410", "1412", "244", "3389"],
@@ -140,7 +140,7 @@ ROWS = [
 	{"code": "13", "label": "- Tăng, giảm chứng khoán kinh doanh", "computed": "balance_change", "prefixes": tuple(CF_INDIRECT_MAPPING["ms13_trading_securities"]), "change_sign": "opening_minus_closing"},
 	{"code": "14", "label": "- Chi phí đi vay đã trả", "computed": "cash_filtered_account_activity", "negative": 1, "prefixes": tuple(CF_INDIRECT_MAPPING["ms14_interest_paid"])},
 	{"code": "15", "label": "- Thuế thu nhập doanh nghiệp đã nộp", "computed": "cash_flow", "direction": "outflow", "prefixes": tuple(CF_INDIRECT_MAPPING["ms15_cit_paid"])},
-	{"code": "16", "label": "- Tiền thu khác từ hoạt động kinh doanh", "computed": "cash_linked_credit_activity", "prefixes": ("515", "711", "7115", "715")},
+	{"code": "16", "label": "- Tiền thu khác từ hoạt động kinh doanh", "computed": "cash_linked_credit_activity", "prefixes": ("711", "7115")},
 	{"code": "17", "label": "- Tiền chi khác cho hoạt động kinh doanh", "computed": "cash_linked_debit_activity", "negative": 1, "prefixes": ("6351", "811"), "exclude_prefixes": ("8119",)},
 	{"code": "20", "label": "Lưu chuyển tiền thuần từ hoạt động kinh doanh", "total": ["08", "09", "10", "11", "12", "13", "14", "15", "16", "17"]},
 	{},
@@ -808,10 +808,11 @@ def get_indirect_rows():
 		primary_rule = rules_by_code[row["code"]][0]
 		merged = dict(row)
 		fixed_row_codes = ("04", "06", "14", "16", "17", "21", "31", "32", "33", "34", "35", "36")
+		custom_account_row_codes = ("16", "17")
 		merged["computed"] = row.get("computed") if row["code"] in fixed_row_codes else primary_rule.computed or row.get("computed")
 		merged["direction"] = primary_rule.direction or row.get("direction")
 		merged["change_sign"] = primary_rule.change_sign or row.get("change_sign")
-		if row["code"] in fixed_row_codes:
+		if row["code"] in fixed_row_codes and row["code"] not in custom_account_row_codes:
 			merged["accounts"] = row.get("accounts") or ()
 			merged["prefixes"] = row.get("prefixes") or ()
 			merged["exclude_prefixes"] = row.get("exclude_prefixes") or ()
@@ -913,7 +914,7 @@ def get_change_sign(change_sign):
 def get_indirect_cash_accounts(company, account_map):
 	accounts = frappe.get_all(
 		"Account",
-		filters={"company": company, "disabled": 0},
+		filters={"company": company},
 		fields=["name", "account_number", "is_group", "lft", "rgt"],
 		order_by="lft",
 	)
