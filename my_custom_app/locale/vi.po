@@ -71722,7 +71722,7 @@ msgstr ""
 
 #: erpnext/controllers/item_variant.py:241
 msgid "Please do not create more than 500 items at a time"
-msgstr "[MY CUSTOM APP OVERRIDE] Vui lòng không tạo hơn 500 mục cùng một lúc"
+msgstr "Vui lòng không tạo hơn 500 mục cùng một lúc"
 
 #: erpnext/accounts/doctype/budget/budget.py:180
 msgid "Please enable Applicable on Booking Actual Expenses"
@@ -97725,7 +97725,7 @@ msgstr "PF bổ sung"
 #: hrms/payroll/workspace/payroll/payroll.json
 #: hrms/workspace_sidebar/payroll.json
 msgid "Additional Salary"
-msgstr "[MY CUSTOM APP OVERRIDE] Lương bổ sung"
+msgstr "Lương bổ sung"
 
 #. Label of the additional_salary (Link) field in DocType 'Salary Detail'
 #: hrms/payroll/doctype/salary_detail/salary_detail.json

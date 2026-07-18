@@ -25,6 +25,9 @@ from erpnext.accounts.utils import get_fiscal_year
 
 
 def execute(filters=None):
+	if filters and filters.get("project") and not isinstance(filters.get("project"), list):
+		filters.project = frappe.parse_json(filters.get("project"))
+
 	period_list = get_period_list(
 		filters.from_fiscal_year,
 		filters.to_fiscal_year,
@@ -90,13 +93,14 @@ def execute(filters=None):
 				section_data.append(net_profit_loss)
 
 		for row in cash_flow_section["account_types"]:
+			account_types = row.get("account_types") or (row["account_type"],)
 			row_data = get_account_type_based_data(
-				filters.company, row["account_type"], period_list, filters.accumulated_values, filters
+				filters.company, account_types, period_list, filters.accumulated_values, filters
 			)
 			accounts = frappe.get_all(
 				"Account",
 				filters={
-					"account_type": row["account_type"],
+					"account_type": ("in", account_types),
 					"is_group": 0,
 				},
 				pluck="name",
@@ -156,7 +160,11 @@ def get_cash_flow_accounts():
 			{"account_type": "Receivable", "label": _("Net Change in Accounts Receivable")},
 			{"account_type": "Payable", "label": _("Net Change in Accounts Payable")},
 			{"account_type": "Tax", "label": _("Net Change in Taxes Payable")},
-			{"account_type": "Stock", "label": _("Net Change in Inventory")},
+			{
+				"account_type": "Stock",
+				"account_types": ("Stock", "Stock Received But Not Billed"),
+				"label": _("Net Change in Inventory"),
+			},
 			{"account_type": "Current Asset", "label": _("Net Change in Other Current Assets")},
 		],
 	}
@@ -179,18 +187,20 @@ def get_cash_flow_accounts():
 	return [operation_accounts, investing_accounts, financing_accounts]
 
 
-def get_account_type_based_data(company, account_type, period_list, accumulated_values, filters):
+def get_account_type_based_data(company, account_types, period_list, accumulated_values, filters):
 	data = {}
 	total = 0
+	account_types = tuple(account_types)
 	for period in period_list:
 		start_date = get_start_date(period, accumulated_values, company)
 		filters.start_date = start_date
 		filters.end_date = period["to_date"]
-		filters.account_type = account_type
+		filters.account_type = account_types[0]
+		filters.account_types = account_types
 
 		amount = get_account_type_based_gl_data(company, filters)
 
-		if amount and account_type == "Depreciation":
+		if amount and account_types == ("Depreciation",):
 			amount *= -1
 
 		total += amount
@@ -216,18 +226,21 @@ def get_account_type_based_gl_data(company, filters=None):
 			frappe.db.escape(cstr(filters.finance_book))
 		)
 
+	if filters.get("project"):
+		cond += " and project in %(project)s"
+
 	if filters.get("cost_center"):
 		filters.cost_center = get_cost_centers_with_children(filters.cost_center)
 		cond += " and cost_center in %(cost_center)s"
 
-	account_filter = "account in ( SELECT name FROM tabAccount WHERE account_type = %(account_type)s)"
+	account_filter = "account in ( SELECT name FROM tabAccount WHERE account_type in %(account_types)s)"
 	if filters.account_type == "Payable":
 		# Also include child accounts whose parent has one of the specified account numbers
 		filters.payable_parent_numbers = ("334", "335", "336", "338")
 		account_filter = """
 			account in (
 				SELECT name FROM tabAccount
-				WHERE account_type = %(account_type)s
+				WHERE account_type in %(account_types)s
 				OR parent_account in (
 					SELECT name FROM tabAccount WHERE account_number in %(payable_parent_numbers)s
 				)
@@ -340,6 +353,7 @@ def get_opening_balance(company, period_list, filters):
 
 		for account in section.get("account_types", []):
 			account_type = account.get("account_type")
+			local_filters.account_types = tuple(account.get("account_types") or (account_type,))
 			local_filters.account_type = account_type
 
 			amount = get_account_type_based_gl_data(company, local_filters) or 0.0

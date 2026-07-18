@@ -1,0 +1,1022 @@
+import frappe
+from frappe import _
+from frappe.utils import cstr, flt, getdate
+
+from erpnext.accounts.doctype.accounting_dimension.accounting_dimension import (
+	get_accounting_dimensions,
+	get_dimension_with_children,
+)
+from erpnext.accounts.report.financial_statements import get_cost_centers_with_children, get_period_list
+
+
+CASH_PREFIXES = ("111", "112", "113")
+SETTINGS_DOCTYPE = "BCLC TT Settings"
+
+DEFAULT_MAPPING_RULES = [
+	{"code": "21", "direction": "outflow", "prefixes": ("211", "212", "213", "217", "241", "242", "3318", "1413"), "priority": 10},
+	{"code": "22", "direction": "inflow", "prefixes": ("211", "212", "213", "217", "241", "242", "3318", "1413"), "priority": 10},
+	{"code": "23", "direction": "outflow", "prefixes": ("128",), "priority": 12},
+	{"code": "24", "direction": "inflow", "prefixes": ("128",), "priority": 12},
+	{"code": "25", "direction": "outflow", "prefixes": ("221", "222", "228"), "priority": 13},
+	{"code": "26", "direction": "inflow", "prefixes": ("221", "222", "228"), "priority": 13},
+	{"code": "27", "direction": "inflow", "prefixes": ("515", "1388"), "priority": 14},
+	{"code": "31", "direction": "inflow", "prefixes": ("411", "419"), "priority": 20},
+	{"code": "32", "direction": "outflow", "prefixes": ("411", "419"), "priority": 20},
+	{"code": "33", "direction": "inflow", "prefixes": ("341", "343"), "priority": 21},
+	{"code": "34", "direction": "outflow", "prefixes": ("341", "343"), "exclude_prefixes": ("3412",), "priority": 21},
+	{"code": "35", "direction": "outflow", "prefixes": ("3412",), "priority": 21},
+	{"code": "36", "direction": "outflow", "prefixes": ("421",), "priority": 22},
+	{"code": "01", "direction": "inflow", "prefixes": ("131", "511", "512", "515", "121", "3387", "3389"), "priority": 30},
+	{"code": "01", "direction": "outflow", "prefixes": ("131", "3389"), "priority": 30},
+	{"code": "02", "direction": "inflow", "prefixes": ("331", "1411"), "priority": 30},
+	{"code": "02", "direction": "outflow", "prefixes": ("331", "1411", "151", "152", "153", "154", "155", "156", "157", "158", "611", "621", "622", "623", "627", "628", "631", "641", "642", "133"), "priority": 30},
+	{"code": "03", "direction": "inflow", "prefixes": ("1410",), "priority": 31},
+	{"code": "03", "direction": "outflow", "prefixes": ("334", "1410"), "priority": 31},
+	{"code": "04", "direction": "outflow", "prefixes": ("335", "635"), "priority": 31},
+	{"code": "05", "direction": "outflow", "prefixes": ("3334", "821"), "priority": 31},
+	{"code": "06", "direction": "inflow", "prefixes": ("711", "1412", "244", "138", "1383", "333"), "priority": 40},
+	{"code": "07", "direction": "outflow", "prefixes": ("811", "1412", "244", "338", "344", "352", "353", "356", "333"), "exclude_prefixes": ("3334",), "priority": 40},
+]
+
+ROWS = [
+	{"label": "I. Lưu chuyển tiền từ hoạt động kinh doanh", "section": 1},
+	{"code": "01", "label": "1. Tiền thu từ bán hàng, cung cấp dịch vụ và doanh thu khác"},
+	{"code": "02", "label": "2. Tiền chi trả cho người cung cấp hàng hóa và dịch vụ", "negative": 1},
+	{"code": "03", "label": "3. Tiền chi trả cho người lao động", "negative": 1},
+	{"code": "04", "label": "4. Chi phí đi vay đã trả", "negative": 1},
+	{"code": "05", "label": "5. Thuế thu nhập doanh nghiệp đã nộp", "negative": 1},
+	{"code": "06", "label": "6. Tiền thu khác từ hoạt động kinh doanh"},
+	{"code": "07", "label": "7. Tiền chi khác cho hoạt động kinh doanh", "negative": 1},
+	{"code": "20", "label": "Lưu chuyển tiền thuần từ hoạt động kinh doanh", "total": ["01", "02", "03", "04", "05", "06", "07"]},
+	{},
+	{"label": "II. Lưu chuyển tiền từ hoạt động đầu tư", "section": 1},
+	{"code": "21", "label": "1. Tiền chi để mua sắm, xây dựng TSCĐ và các tài sản dài hạn khác", "negative": 1},
+	{"code": "22", "label": "2. Tiền thu từ thanh lý, nhượng bán TSCĐ và các tài sản dài hạn khác"},
+	{"code": "23", "label": "3. Tiền chi cho vay, mua các công cụ nợ của đơn vị khác", "negative": 1},
+	{"code": "24", "label": "4. Tiền thu hồi cho vay, bán lại các công cụ nợ của đơn vị khác"},
+	{"code": "25", "label": "5. Tiền chi đầu tư góp vốn vào đơn vị khác", "negative": 1},
+	{"code": "26", "label": "6. Tiền thu hồi đầu tư góp vốn vào đơn vị khác"},
+	{"code": "27", "label": "7. Tiền thu lãi cho vay, cổ tức và lợi nhuận được chia"},
+	{"code": "30", "label": "Lưu chuyển tiền thuần từ hoạt động đầu tư", "total": ["21", "22", "23", "24", "25", "26", "27"]},
+	{},
+	{"label": "III. Lưu chuyển tiền từ hoạt động tài chính", "section": 1},
+	{"code": "31", "label": "1. Tiền thu từ phát hành cổ phiếu, nhận vốn góp của chủ sở hữu"},
+	{"code": "32", "label": "2. Tiền trả lại vốn góp cho các chủ sở hữu, mua lại cổ phiếu đã phát hành", "negative": 1},
+	{"code": "33", "label": "3. Tiền thu từ đi vay"},
+	{"code": "34", "label": "4. Tiền trả nợ gốc vay", "negative": 1},
+	{"code": "35", "label": "5. Tiền trả nợ gốc thuê tài chính", "negative": 1},
+	{"code": "36", "label": "6. Cổ tức, lợi nhuận đã trả cho chủ sở hữu", "negative": 1},
+	{"code": "40", "label": "Lưu chuyển tiền thuần từ hoạt động tài chính", "total": ["31", "32", "33", "34", "35", "36"]},
+	{},
+	{"code": "50", "label": "Lưu chuyển tiền thuần trong kỳ (50 = 20+30+40)", "total": ["20", "30", "40"]},
+	{"code": "60", "label": "Tiền và tương đương tiền đầu kỳ", "computed": "opening"},
+	{"code": "61", "label": "Ảnh hưởng của thay đổi tỷ giá hối đoái quy đổi ngoại tệ", "computed": "exchange"},
+	{"code": "70", "label": "Tiền và tương đương tiền cuối kỳ (70 = 50+60+61)", "computed": "closing"},
+	{},
+	{"label": "IV. Giao dịch không dùng tiền", "section": 1},
+	{"code": "80", "label": "1. Vay/thuê tài chính giải ngân trực tiếp thanh toán nhà cung cấp", "computed": "non_cash"},
+]
+
+
+def execute(filters=None):
+	filters = frappe._dict(filters or {})
+	validate_filters(filters)
+
+	period_list = get_period_list(
+		filters.from_fiscal_year,
+		filters.to_fiscal_year,
+		filters.period_start_date,
+		filters.period_end_date,
+		filters.filter_based_on,
+		filters.periodicity,
+		company=filters.company,
+	)
+	company_currency = frappe.get_cached_value("Company", filters.company, "default_currency")
+	account_map = get_account_map(filters.company)
+	cash_accounts = get_cash_accounts(filters.company, account_map)
+	period_values, period_accounts = get_period_values(filters, period_list, account_map, cash_accounts)
+	data = build_data(period_list, period_values, company_currency, period_accounts, cash_accounts)
+	columns = get_columns(period_list)
+	chart = get_chart_data(period_list, period_values, company_currency)
+	report_summary = get_report_summary(period_list, period_values, company_currency)
+
+	return columns, data, None, chart, report_summary
+
+
+@frappe.whitelist()
+def add_to_financial_reports_workspace():
+	workspace = frappe.get_doc("Workspace", "Financial Reports")
+	for link in workspace.links:
+		if link.link_type == "Report" and link.link_to == "BCLC-TT-TT99-TT":
+			return "exists"
+
+	workspace.append(
+		"links",
+		{
+			"type": "Link",
+			"label": "BCLC-TT-TT99-TT",
+			"link_type": "Report",
+			"link_to": "BCLC-TT-TT99-TT",
+			"is_query_report": 1,
+			"dependencies": "GL Entry",
+			"hidden": 0,
+			"onboard": 0,
+			"link_count": 0,
+		},
+	)
+	workspace.save(ignore_permissions=True)
+	frappe.db.commit()
+
+	return "added"
+
+
+def validate_filters(filters):
+	if not filters.get("company"):
+		frappe.throw(_("Company is mandatory"))
+
+
+def get_columns(period_list):
+	columns = [
+		{
+			"fieldname": "section",
+			"label": _("Chỉ tiêu"),
+			"fieldtype": "Data",
+			"width": 430,
+		},
+		{
+			"fieldname": "code",
+			"label": _("Mã số"),
+			"fieldtype": "Data",
+			"width": 80,
+		},
+		{
+			"fieldname": "explanation",
+			"label": _("Thuyết minh"),
+			"fieldtype": "Data",
+			"width": 110,
+		},
+	]
+
+	for period in period_list:
+		columns.append(
+			{
+				"fieldname": period["key"],
+				"label": period["label"],
+				"fieldtype": "Currency",
+				"options": "currency",
+				"width": 140,
+			}
+		)
+
+	if len(period_list) > 1:
+		columns.append(
+			{
+				"fieldname": "total",
+				"label": _("Tổng cộng"),
+				"fieldtype": "Currency",
+				"options": "currency",
+				"width": 140,
+			}
+		)
+
+	return columns
+
+
+def get_period_values(filters, period_list, account_map, cash_accounts):
+	values = {row["code"]: {period["key"]: 0 for period in period_list} for row in ROWS if row.get("code")}
+	period_accounts = {
+		row["code"]: {"all": set(), **{period["key"]: set() for period in period_list}}
+		for row in ROWS
+		if row.get("code")
+	}
+
+	for period in period_list:
+		period_key = period["key"]
+		cash_flow_details = get_cash_flow_details_by_code(filters, period, account_map, cash_accounts)
+		non_cash_values = get_non_cash_transaction_values(filters, period, account_map)
+
+		for detail in cash_flow_details:
+			code = detail.cash_flow_code
+			values[code][period_key] = flt(values[code][period_key] + detail.cash_flow_amount)
+			period_accounts[code][period_key].add(detail.account)
+			period_accounts[code]["all"].add(detail.account)
+
+		for row in ROWS:
+			if row.get("total"):
+				values[row["code"]][period_key] = flt(sum(values[code][period_key] for code in row["total"]))
+
+		opening = get_cash_balance(
+			filters,
+			period["from_date"],
+			cash_accounts,
+			before_date=True,
+			period_end_date=period["to_date"],
+		)
+		closing = get_cash_balance(filters, period["to_date"], cash_accounts)
+		net_change = values["50"][period_key]
+
+		values["60"][period_key] = opening
+		values["70"][period_key] = closing
+		values["61"][period_key] = flt(closing - opening - net_change, 2)
+		values["80"][period_key] = non_cash_values.get("80", 0)
+
+	for code, account_map_by_period in period_accounts.items():
+		for key, accounts in account_map_by_period.items():
+			period_accounts[code][key] = sorted(accounts)
+
+	return values, period_accounts
+
+
+def build_data(period_list, period_values, currency, period_accounts, cash_accounts):
+	data = []
+	current_section = None
+	period_ranges = {
+		period["key"]: {"from_date": period["from_date"], "to_date": period["to_date"]}
+		for period in period_list
+	}
+
+	for row in ROWS:
+		if not row:
+			data.append({})
+			continue
+
+		out = {
+			"section": row["label"],
+			"code": row.get("code"),
+			"explanation": "",
+			"currency": currency,
+			"indent": 0 if row.get("section") else 1,
+			"from_date": period_list[0]["from_date"],
+			"to_date": period_list[-1]["to_date"],
+			"period_ranges": period_ranges,
+		}
+
+		if row.get("section"):
+			out["is_group"] = 1
+			current_section = row["label"]
+		else:
+			if not row.get("total") and row.get("computed") not in ("opening", "exchange", "closing", "non_cash"):
+				out["parent_section"] = current_section
+				out["accounts"] = sorted(cash_accounts)
+				out["period_accounts"] = {
+					period["key"]: period_accounts.get(row["code"], {}).get(period["key"], [])
+					for period in period_list
+				}
+			total = 0
+			for period in period_list:
+				amount = flt(period_values[row["code"]][period["key"]])
+				out[period["key"]] = amount
+				total += amount
+			out["total"] = total
+
+		data.append(out)
+
+	return data
+
+
+def get_cash_flow_detail_entries(filters):
+	filters = frappe._dict(filters or {})
+	account_map = get_account_map(filters.company)
+	if filters.get("cash_flow_code") == "80":
+		period = frappe._dict(
+			{
+				"from_date": getdate(filters.from_date),
+				"to_date": getdate(filters.to_date),
+			}
+		)
+		return get_non_cash_detail_entries(filters, period, account_map)
+
+	cash_accounts = get_cash_accounts(filters.company, account_map)
+	period = frappe._dict(
+		{
+			"from_date": getdate(filters.from_date),
+			"to_date": getdate(filters.to_date),
+		}
+	)
+	return get_cash_flow_details_by_code(filters, period, account_map, cash_accounts, filters.get("cash_flow_code"))
+
+
+def get_non_cash_detail_entries(filters, period, account_map):
+	entries_by_voucher = get_non_cash_voucher_entries(filters, period, account_map)
+	details = []
+
+	for entries in entries_by_voucher.values():
+		non_cash_amount = get_direct_loan_supplier_non_cash_amount(entries, account_map)
+		if not non_cash_amount:
+			continue
+
+		details.extend(
+			make_non_cash_detail_rows(
+				entries,
+				account_map,
+				non_cash_amount,
+			)
+		)
+
+	return details
+
+
+def make_non_cash_detail_rows(entries, account_map, non_cash_amount):
+	rows = []
+	rows.extend(
+		make_limited_non_cash_rows(
+			entries,
+			account_map,
+			non_cash_amount,
+			("331", "3318", "1411", "1413"),
+			"debit",
+		)
+	)
+	rows.extend(
+		make_limited_non_cash_rows(
+			entries,
+			account_map,
+			non_cash_amount,
+			("341", "343"),
+			"credit",
+		)
+	)
+	return rows
+
+
+def make_limited_non_cash_rows(entries, account_map, limit, prefixes, side):
+	rows = []
+	remaining = flt(limit)
+
+	for entry in entries:
+		if remaining <= 0:
+			break
+
+		account_number = get_account_number(entry.account, account_map)
+		if not startswith_any(account_number, prefixes):
+			continue
+
+		entry_amount = flt(entry.debit) - flt(entry.credit)
+		if side == "debit":
+			available = max(entry_amount, 0)
+		else:
+			available = max(-entry_amount, 0)
+
+		allocated = min(available, remaining)
+		if not allocated:
+			continue
+
+		row = frappe._dict(entry.copy())
+		row.cash_flow_code = "80"
+		row.debit = allocated if side == "debit" else 0
+		row.credit = allocated if side == "credit" else 0
+		row.debit_in_account_currency = row.debit
+		row.credit_in_account_currency = row.credit
+		row.account_currency = entry.get("account_currency")
+		rows.append(row)
+		remaining = flt(remaining - allocated)
+
+	return rows
+
+
+def get_cash_flow_by_code(filters, period, account_map):
+	amounts = {}
+	cash_accounts = get_cash_accounts(filters.company, account_map)
+	for detail in get_cash_flow_details_by_code(filters, period, account_map, cash_accounts):
+		code = detail.cash_flow_code
+		amounts[code] = flt(amounts.get(code, 0) + detail.cash_flow_amount)
+
+	return amounts
+
+
+def get_non_cash_transaction_values(filters, period, account_map):
+	entries_by_voucher = get_non_cash_voucher_entries(filters, period, account_map)
+	values = {"80": 0}
+
+	for entries in entries_by_voucher.values():
+		values["80"] = flt(values["80"] + get_direct_loan_supplier_non_cash_amount(entries, account_map))
+
+	return values
+
+
+def get_non_cash_voucher_entries(filters, period, account_map):
+	conditions, values = get_common_conditions(filters)
+	values.update({"from_date": period["from_date"], "to_date": period["to_date"]})
+
+	entries = frappe.db.sql(
+		f"""
+		select
+			name as gl_entry, posting_date, account, debit, credit,
+			debit_in_account_currency, credit_in_account_currency,
+			voucher_type, voucher_no, cost_center, project,
+			against, party_type, party, account_currency, is_opening, creation, remarks
+		from `tabGL Entry`
+		where company = %(company)s
+			and posting_date between %(from_date)s and %(to_date)s
+			and is_cancelled = 0
+			{get_period_closing_condition(filters)}
+			and ifnull(is_opening, '') != 'Yes'
+			{conditions}
+		order by posting_date, voucher_type, voucher_no, name
+		""",
+		values,
+		as_dict=True,
+	)
+
+	grouped = {}
+	for entry in entries:
+		grouped.setdefault((entry.voucher_type, entry.voucher_no), []).append(entry)
+
+	return {
+		voucher: voucher_entries
+		for voucher, voucher_entries in grouped.items()
+		if is_direct_loan_supplier_settlement(voucher_entries, account_map)
+	}
+
+
+def is_direct_loan_supplier_settlement(entries, account_map):
+	return get_direct_loan_supplier_non_cash_amount(entries, account_map) > 0
+
+
+def get_direct_loan_supplier_non_cash_amount(entries, account_map):
+	loan_credit = 0
+	loan_debit = 0
+	supplier_debit = 0
+	supplier_credit = 0
+	cash_debit = 0
+	cash_credit = 0
+
+	for entry in entries:
+		account_number = get_account_number(entry.account, account_map)
+		amount = flt(entry.debit) - flt(entry.credit)
+		if startswith_any(account_number, CASH_PREFIXES):
+			if amount > 0:
+				cash_debit += amount
+			elif amount < 0:
+				cash_credit += abs(amount)
+		elif startswith_any(account_number, ("341", "343")):
+			if amount < 0:
+				loan_credit += abs(amount)
+			elif amount > 0:
+				loan_debit += amount
+		elif startswith_any(account_number, ("331", "3318", "1411", "1413")):
+			if amount > 0:
+				supplier_debit += amount
+			elif amount < 0:
+				supplier_credit += abs(amount)
+
+	loan_net_credit = max(loan_credit - loan_debit, 0)
+	supplier_net_debit = max(supplier_debit - supplier_credit, 0)
+	cash_outflow = max(cash_credit - cash_debit, 0)
+	cash_inflow = max(cash_debit - cash_credit, 0)
+	non_cash_base = min(loan_net_credit, supplier_net_debit)
+
+	if cash_outflow:
+		non_cash_base = max(non_cash_base - cash_outflow, 0)
+	elif cash_inflow and loan_net_credit > supplier_net_debit:
+		non_cash_base = min(non_cash_base, supplier_net_debit)
+
+	return flt(non_cash_base)
+
+
+def get_cash_flow_details_by_code(filters, period, account_map, cash_accounts, cash_flow_code=None):
+	details = []
+	voucher_entries = get_cash_voucher_entries(filters, period, cash_accounts)
+	account_filter = get_list_filter(filters.get("account"))
+	rules = get_cash_flow_mapping_rules()
+
+	for entries in voucher_entries.values():
+		all_cash_entries = [entry for entry in entries if entry.account in cash_accounts]
+		non_cash_entries = [entry for entry in entries if entry.account not in cash_accounts]
+		external_cash_entries = get_external_cash_entries(all_cash_entries)
+
+		cash_entries = external_cash_entries
+		if account_filter:
+			cash_entries = [entry for entry in cash_entries if entry.account in account_filter]
+		net_cash_movement = flt(sum(flt(entry.cash_amount) for entry in cash_entries))
+
+		for cash_entry in cash_entries:
+			cash_amount = flt(cash_entry.cash_amount)
+			if not cash_amount:
+				continue
+
+			direction = "inflow" if cash_amount > 0 else "outflow"
+			counter_entries = get_counter_entries(cash_amount, non_cash_entries, entries, account_map)
+			allocated = allocate_cash_amount(abs(cash_amount), counter_entries)
+
+			if not allocated:
+				if not non_cash_entries and not net_cash_movement:
+					continue
+				code = "06" if direction == "inflow" else "07"
+				if not cash_flow_code or code == cash_flow_code:
+					details.append(
+						make_cash_flow_detail_row(
+							cash_entry, None, code, direction, abs(cash_amount), account_map
+						)
+					)
+				continue
+
+			for counter_entry, amount in allocated:
+				code = classify_cash_flow(direction, counter_entry, account_map, entries, rules)
+				if not code:
+					continue
+				if cash_flow_code and code != cash_flow_code:
+					continue
+				details.append(
+					make_cash_flow_detail_row(cash_entry, counter_entry, code, direction, amount, account_map)
+				)
+
+	return details
+
+
+def get_external_cash_entries(cash_entries):
+	cash_debit = sum(max(flt(entry.debit) - flt(entry.credit), 0) for entry in cash_entries)
+	cash_credit = sum(max(flt(entry.credit) - flt(entry.debit), 0) for entry in cash_entries)
+	internal_cash_amount = min(cash_debit, cash_credit)
+	debit_transfer_remaining = internal_cash_amount
+	credit_transfer_remaining = internal_cash_amount
+	external_entries = []
+
+	for entry in cash_entries:
+		cash_amount = flt(entry.debit) - flt(entry.credit)
+		if cash_amount > 0:
+			deducted = min(cash_amount, debit_transfer_remaining)
+			debit_transfer_remaining = flt(debit_transfer_remaining - deducted)
+			external_amount = flt(cash_amount - deducted)
+		elif cash_amount < 0:
+			outflow_amount = abs(cash_amount)
+			deducted = min(outflow_amount, credit_transfer_remaining)
+			credit_transfer_remaining = flt(credit_transfer_remaining - deducted)
+			external_amount = flt(-(outflow_amount - deducted))
+		else:
+			external_amount = 0
+
+		if not external_amount:
+			continue
+
+		external_entry = frappe._dict(entry.copy())
+		external_entry.cash_amount = external_amount
+		external_entries.append(external_entry)
+
+	return external_entries
+
+
+def make_cash_flow_detail_row(cash_entry, counter_entry, code, direction, amount, account_map):
+	signed_amount = flt(amount if direction == "inflow" else -amount)
+	debit = flt(amount if direction == "inflow" else 0)
+	credit = flt(amount if direction == "outflow" else 0)
+
+	row = frappe._dict(cash_entry.copy())
+	row.update(
+		{
+			"account": cash_entry.account,
+			"against": counter_entry.account if counter_entry else cash_entry.get("against"),
+			"cash_flow_code": code,
+			"cash_flow_amount": signed_amount,
+			"debit": debit,
+			"credit": credit,
+			"debit_in_account_currency": debit,
+			"credit_in_account_currency": credit,
+			"account_currency": cash_entry.get("account_currency"),
+			"remarks": cash_entry.get("remarks"),
+		}
+	)
+
+	return row
+
+
+def get_cash_voucher_entries(filters, period, cash_accounts):
+	conditions, values = get_common_conditions(filters)
+	values.update({"from_date": period["from_date"], "to_date": period["to_date"]})
+
+	cash_accounts = list(cash_accounts)
+	account_filter = get_list_filter(filters.get("account"))
+	if account_filter:
+		cash_accounts = [account for account in cash_accounts if account in account_filter]
+
+	if not cash_accounts:
+		return {}
+
+	values["cash_accounts"] = cash_accounts
+
+	voucher_refs = frappe.db.sql(
+		f"""
+		select distinct voucher_type, voucher_no
+		from `tabGL Entry`
+		where company = %(company)s
+			and posting_date between %(from_date)s and %(to_date)s
+			and is_cancelled = 0
+			{get_period_closing_condition(filters)}
+			and ifnull(is_opening, '') != 'Yes'
+			and account in %(cash_accounts)s
+			{conditions}
+		""",
+		values,
+		as_dict=True,
+	)
+
+	if not voucher_refs:
+		return {}
+
+	values["voucher_nos"] = [d.voucher_no for d in voucher_refs]
+	accounting_dimensions = get_accounting_dimensions()
+	dimension_fields = ", ".join(accounting_dimensions) + "," if accounting_dimensions else ""
+	entries = frappe.db.sql(
+		f"""
+		select
+			name as gl_entry, posting_date, account, debit, credit,
+			debit_in_account_currency, credit_in_account_currency,
+			voucher_type, voucher_no, {dimension_fields}
+			cost_center, project, against_voucher_type, against_voucher,
+			against, party_type, party, account_currency, is_opening, creation, remarks
+		from `tabGL Entry`
+		where company = %(company)s
+			and posting_date between %(from_date)s and %(to_date)s
+			and is_cancelled = 0
+			{get_period_closing_condition(filters)}
+			and voucher_no in %(voucher_nos)s
+		order by posting_date, voucher_type, voucher_no, name
+		""",
+		values,
+		as_dict=True,
+	)
+
+	grouped = {}
+	for entry in entries:
+		grouped.setdefault((entry.voucher_type, entry.voucher_no), []).append(entry)
+
+	return grouped
+
+
+def get_common_conditions(filters):
+	conditions = []
+	values = {"company": filters.company}
+
+	if filters.get("finance_book"):
+		if filters.get("include_default_book_entries"):
+			company_fb = frappe.get_cached_value("Company", filters.company, "default_finance_book")
+			values.update({"finance_book": filters.finance_book, "company_fb": company_fb})
+			conditions.append("and (finance_book in (%(finance_book)s, %(company_fb)s, '') or finance_book is null)")
+		else:
+			values["finance_book"] = cstr(filters.finance_book)
+			conditions.append("and (finance_book in (%(finance_book)s, '') or finance_book is null)")
+
+	if filters.get("project"):
+		project = filters.project
+		if isinstance(project, str):
+			project = frappe.parse_json(project) if project.startswith("[") else [project]
+		values["project"] = project
+		conditions.append("and project in %(project)s")
+
+	if filters.get("cost_center"):
+		values["cost_center"] = get_cost_centers_with_children(filters.cost_center)
+		conditions.append("and cost_center in %(cost_center)s")
+
+	for dimension in get_accounting_dimensions(as_list=False):
+		fieldname = dimension.fieldname
+		if not filters.get(fieldname):
+			continue
+
+		if frappe.get_cached_value("DocType", dimension.document_type, "is_tree"):
+			values[fieldname] = get_dimension_with_children(dimension.document_type, filters.get(fieldname))
+			conditions.append(f"and {fieldname} in %({fieldname})s")
+		else:
+			values[fieldname] = filters.get(fieldname)
+			conditions.append(f"and {fieldname} = %({fieldname})s")
+
+	return "\n\t\t\t" + "\n\t\t\t".join(conditions) if conditions else "", values
+
+
+def get_list_filter(value):
+	if not value:
+		return []
+
+	if isinstance(value, str):
+		return frappe.parse_json(value) if value.startswith("[") else [value]
+
+	return value
+
+
+def get_counter_entries(cash_amount, non_cash_entries, voucher_entries=None, account_map=None):
+	if cash_amount > 0:
+		counter_entries = [entry for entry in non_cash_entries if flt(entry.credit) > flt(entry.debit)]
+	else:
+		counter_entries = [entry for entry in non_cash_entries if flt(entry.debit) > flt(entry.credit)]
+
+	counter_entries = counter_entries or non_cash_entries
+	return get_effective_counter_entries(counter_entries, voucher_entries or [], account_map or {})
+
+
+def get_effective_counter_entries(counter_entries, voucher_entries, account_map):
+	if not counter_entries:
+		return []
+
+	voucher_type = cstr(voucher_entries[0].voucher_type) if voucher_entries else ""
+	if voucher_type != "Expense Claim":
+		return counter_entries
+
+	non_payable_entries = [
+		entry for entry in counter_entries if not is_payable_clearing_entry(entry, voucher_entries, account_map)
+	]
+	return non_payable_entries or counter_entries
+
+
+def is_payable_clearing_entry(entry, voucher_entries, account_map):
+	if is_self_clearing_account(entry, voucher_entries):
+		return True
+
+	account_number = get_account_number(entry.account, account_map)
+	if startswith_any(account_number, ("334", "335", "336", "338")):
+		return True
+
+	account_type = frappe.get_cached_value("Account", entry.account, "account_type")
+	return account_type == "Payable"
+
+
+def is_self_clearing_account(entry, voucher_entries):
+	account_entries = [row for row in voucher_entries if row.account == entry.account]
+	has_debit = any(flt(row.debit) > flt(row.credit) for row in account_entries)
+	has_credit = any(flt(row.credit) > flt(row.debit) for row in account_entries)
+	return has_debit and has_credit
+
+
+def allocate_cash_amount(cash_amount, counter_entries):
+	if not counter_entries:
+		return []
+
+	weights = [abs(flt(entry.debit) - flt(entry.credit)) for entry in counter_entries]
+	total_weight = sum(weights)
+
+	if not total_weight:
+		share = flt(cash_amount / len(counter_entries))
+		return [(entry, share) for entry in counter_entries]
+
+	allocated = []
+	remaining = cash_amount
+	for index, entry in enumerate(counter_entries):
+		if index == len(counter_entries) - 1:
+			amount = remaining
+		else:
+			amount = flt(cash_amount * weights[index] / total_weight)
+			remaining = flt(remaining - amount)
+		allocated.append((entry, amount))
+
+	return allocated
+
+
+def classify_cash_flow(direction, counter_entry, account_map, voucher_entries, rules):
+	account_number = get_account_number(counter_entry.account, account_map)
+	for rule in rules:
+		if rule.direction != direction:
+			continue
+		if rule.accounts and counter_entry.account not in rule.accounts:
+			continue
+		if rule.prefixes and not startswith_any(account_number, rule.prefixes):
+			continue
+		if rule.exclude_prefixes and startswith_any(account_number, rule.exclude_prefixes):
+			continue
+		if rule.keywords and not has_voucher_keywords(rule.keywords, counter_entry, voucher_entries):
+			continue
+		return rule.code
+
+	return "06" if direction == "inflow" else "07"
+
+
+def get_cash_flow_mapping_rules():
+	custom_rules = get_custom_cash_flow_mapping_rules()
+	if custom_rules:
+		return custom_rules
+
+	return [
+		frappe._dict(
+			{
+				"code": rule["code"],
+				"direction": rule["direction"],
+				"accounts": tuple(rule.get("accounts") or ()),
+				"prefixes": tuple(rule.get("prefixes") or ()),
+				"exclude_prefixes": tuple(rule.get("exclude_prefixes") or ()),
+				"keywords": tuple(rule.get("keywords") or ()),
+				"priority": rule.get("priority", 100),
+			}
+		)
+		for rule in sorted(DEFAULT_MAPPING_RULES, key=lambda row: row.get("priority", 100))
+	]
+
+
+def get_custom_cash_flow_mapping_rules():
+	if not is_bclc_settings_available():
+		return []
+
+	settings = frappe.get_single(SETTINGS_DOCTYPE)
+	if not settings.enabled or not settings.enable_custom_mapping:
+		return []
+
+	rules = []
+	for row in settings.account_rules:
+		if not row.enabled:
+			continue
+
+		direction = "inflow" if row.direction == "Inflow" else "outflow"
+		rules.append(
+			frappe._dict(
+				{
+					"code": row.cash_flow_code,
+					"direction": direction,
+					"accounts": tuple([row.account] if row.account else []),
+					"prefixes": tuple(split_csv(row.account_prefix)),
+					"exclude_prefixes": tuple(split_csv(row.exclude_account_prefix)),
+					"keywords": tuple(split_csv(row.voucher_keywords)),
+					"priority": row.priority or 100,
+				}
+			)
+		)
+
+	return sorted(rules, key=lambda row: row.priority)
+
+
+def has_voucher_keywords(keywords, counter_entry, voucher_entries):
+	text_parts = [
+		counter_entry.get("voucher_type"),
+		counter_entry.get("voucher_no"),
+		counter_entry.get("remarks"),
+		counter_entry.get("against"),
+	]
+	for entry in voucher_entries:
+		text_parts.extend([entry.get("account"), entry.get("remarks"), entry.get("against")])
+
+	text = " ".join(cstr(part).lower() for part in text_parts if part)
+	return any(cstr(keyword).lower() in text for keyword in keywords)
+
+
+def get_cash_balance(filters, date, cash_accounts, before_date=False, period_end_date=None):
+	conditions, values = get_common_conditions(filters)
+	values["date"] = getdate(date)
+	values["cash_accounts"] = list(cash_accounts)
+
+	if not values["cash_accounts"]:
+		return 0
+
+	if before_date:
+		values["period_end_date"] = getdate(period_end_date or date)
+		date_condition = """(
+			posting_date < %(date)s
+			or (ifnull(is_opening, '') = 'Yes' and posting_date <= %(period_end_date)s)
+		)"""
+	else:
+		date_condition = "posting_date <= %(date)s"
+
+	balance = frappe.db.sql(
+		f"""
+		select sum(debit) - sum(credit)
+		from `tabGL Entry`
+		where company = %(company)s
+			and {date_condition}
+			and is_cancelled = 0
+			{get_period_closing_condition(filters)}
+			and account in %(cash_accounts)s
+			{conditions}
+		""",
+		values,
+	)[0][0]
+
+	return flt(balance)
+
+
+def get_period_closing_condition(filters):
+	if filters.get("include_period_closing_voucher"):
+		return ""
+
+	return "and voucher_type != 'Period Closing Voucher'"
+
+
+def get_account_map(company):
+	accounts = frappe.get_all(
+		"Account",
+		filters={"company": company},
+		fields=["name", "account_number"],
+	)
+	return {account.name: cstr(account.account_number).replace(".", "").replace(" ", "") for account in accounts}
+
+
+def get_cash_accounts(company, account_map):
+	accounts = frappe.get_all(
+		"Account",
+		filters={"company": company},
+		fields=["name", "account_number", "is_group", "lft", "rgt"],
+		order_by="lft",
+	)
+	custom_cash_accounts = get_custom_cash_accounts(company, accounts, account_map)
+	if custom_cash_accounts:
+		return custom_cash_accounts
+
+	cash_roots = [
+		account
+		for account in accounts
+		if startswith_any(get_account_number(account.name, account_map), CASH_PREFIXES)
+	]
+
+	cash_accounts = set()
+	for account in accounts:
+		if account.is_group:
+			continue
+
+		for root in cash_roots:
+			if account.lft >= root.lft and account.rgt <= root.rgt:
+				cash_accounts.add(account.name)
+				break
+
+	return cash_accounts
+
+
+def get_custom_cash_accounts(company, accounts, account_map):
+	if not is_bclc_settings_available():
+		return set()
+
+	settings = frappe.get_single(SETTINGS_DOCTYPE)
+	if not settings.enabled:
+		return set()
+
+	configured_rows = [
+		row
+		for row in settings.cash_accounts
+		if row.enabled and (not row.company or row.company == company) and (row.account or row.account_prefix)
+	]
+	if not configured_rows:
+		return set()
+
+	accounts_by_name = {account.name: account for account in accounts}
+	cash_accounts = set()
+
+	for row in configured_rows:
+		if row.account:
+			account = accounts_by_name.get(row.account)
+			if not account:
+				continue
+			if account.is_group:
+				cash_accounts.update(get_leaf_accounts_inside(account, accounts))
+			else:
+				cash_accounts.add(account.name)
+
+		for prefix in split_csv(row.account_prefix):
+			for account in accounts:
+				if account.is_group:
+					continue
+				if startswith_any(get_account_number(account.name, account_map), (prefix,)):
+					cash_accounts.add(account.name)
+
+	return cash_accounts
+
+
+def get_leaf_accounts_inside(root, accounts):
+	return {
+		account.name
+		for account in accounts
+		if not account.is_group and account.lft >= root.lft and account.rgt <= root.rgt
+	}
+
+
+def get_account_number(account, account_map):
+	return account_map.get(account) or cstr(account).split(" - ")[0].replace(".", "").replace(" ", "")
+
+
+def is_cash_account(account, account_map):
+	return startswith_any(get_account_number(account, account_map), CASH_PREFIXES)
+
+
+def startswith_any(value, prefixes):
+	return any(cstr(value).startswith(prefix) for prefix in prefixes)
+
+
+def split_csv(value):
+	if not value:
+		return []
+
+	return [item.strip() for item in cstr(value).replace("\n", ",").split(",") if item.strip()]
+
+
+def is_bclc_settings_available():
+	try:
+		return frappe.db.exists("DocType", SETTINGS_DOCTYPE)
+	except Exception:
+		return False
+
+
+def get_report_summary(period_list, period_values, currency):
+	last_period = period_list[-1]["key"]
+	return [
+		{"value": period_values["20"][last_period], "label": _("LC tiền thuần từ HĐKD"), "datatype": "Currency", "currency": currency},
+		{"value": period_values["30"][last_period], "label": _("LC tiền thuần từ HĐĐT"), "datatype": "Currency", "currency": currency},
+		{"value": period_values["40"][last_period], "label": _("LC tiền thuần từ HĐTC"), "datatype": "Currency", "currency": currency},
+		{"value": period_values["70"][last_period], "label": _("Tiền cuối kỳ"), "datatype": "Currency", "currency": currency},
+	]
+
+
+def get_chart_data(period_list, period_values, currency):
+	return {
+		"data": {
+			"labels": [period["label"] for period in period_list],
+			"datasets": [
+				{"name": _("Hoạt động kinh doanh"), "values": [period_values["20"][period["key"]] for period in period_list]},
+				{"name": _("Hoạt động đầu tư"), "values": [period_values["30"][period["key"]] for period in period_list]},
+				{"name": _("Hoạt động tài chính"), "values": [period_values["40"][period["key"]] for period in period_list]},
+			],
+		},
+		"type": "bar",
+		"fieldtype": "Currency",
+		"currency": currency,
+	}

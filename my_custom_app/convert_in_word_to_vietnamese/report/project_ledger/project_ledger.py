@@ -4,6 +4,9 @@ from frappe.utils import flt
 
 def execute(filters=None):
     filters = frappe._dict(filters or {})
+    if filters.get("project") and not isinstance(filters.get("project"), list):
+        filters.project = frappe.parse_json(filters.get("project"))
+
     columns = get_columns()
     data = []
 
@@ -20,6 +23,7 @@ def get_columns():
         {"label": "Posting Date", "fieldname": "posting_date", "fieldtype": "Date", "width": 100},
         {"label": "Account", "fieldname": "account", "fieldtype": "Link", "options": "Account", "width": 180},
         {"label": "Amount", "fieldname": "amount", "fieldtype": "Currency", "width": 120},
+        {"label": "Cost Center", "fieldname": "cost_center", "fieldtype": "Link", "options": "Cost Center", "width": 140},
         {"label": "Remarks", "fieldname": "remarks", "fieldtype": "Data", "width": 200},
         {"label": "Voucher Type", "fieldname": "voucher_type", "fieldtype": "Data", "width": 120},
         {"label": "Voucher Subtype", "fieldname": "voucher_subtype", "fieldtype": "Data", "width": 120},
@@ -40,7 +44,7 @@ def get_common_filters(filters):
     if filters.get("finance_book"):
         common_filters["finance_book"] = filters.finance_book
     if filters.get("project"):
-        common_filters["project"] = filters.project
+        common_filters["project"] = ["in", filters.project]
     if filters.get("cost_center"):
         common_filters["cost_center"] = filters.cost_center
     if filters.get("voucher_type"):
@@ -63,7 +67,7 @@ def get_cash_flow_data(filters):
     entries = frappe.get_all("GL Entry",
         filters=common_filters,
         fields=[
-            "posting_date", "account", "remarks", "voucher_type", "voucher_subtype",
+            "posting_date", "account", "cost_center", "remarks", "voucher_type", "voucher_subtype",
             "voucher_no", "against", "party_type", "party", "debit", "credit"
         ],
         order_by="posting_date asc"
@@ -74,6 +78,7 @@ def get_cash_flow_data(filters):
         row = {
             "posting_date": e.posting_date,
             "account": e.account,
+            "cost_center": e.cost_center or "",
             "remarks": e.remarks or "",
             "voucher_type": e.voucher_type,
             "voucher_subtype": e.voucher_subtype or "",
@@ -106,7 +111,7 @@ def get_cash_flow_data(filters):
         disburse_entries = frappe.get_all("GL Entry",
             filters=disburse_filters,
             fields=[
-                "posting_date", "account", "remarks", "voucher_type", "voucher_subtype",
+                "posting_date", "account", "cost_center", "remarks", "voucher_type", "voucher_subtype",
                 "voucher_no", "against", "party_type", "party", "debit", "credit"
             ],
             order_by="posting_date asc"
@@ -118,6 +123,7 @@ def get_cash_flow_data(filters):
                 row = {
                     "posting_date": e.posting_date,
                     "account": e.account,
+                    "cost_center": e.cost_center or "",
                     "remarks": e.remarks or "",
                     "voucher_type": e.voucher_type,
                     "voucher_subtype": e.voucher_subtype or "",
@@ -152,7 +158,7 @@ def get_cash_flow_data(filters):
         nc_entries = frappe.get_all("GL Entry",
             filters=nc_filters,
             fields=[
-                "posting_date", "account", "remarks", "voucher_type", "voucher_subtype",
+                "posting_date", "account", "cost_center", "remarks", "voucher_type", "voucher_subtype",
                 "voucher_no", "against", "party_type", "party", "debit", "credit"
             ],
             order_by="posting_date asc"
@@ -164,6 +170,7 @@ def get_cash_flow_data(filters):
                 row = {
                     "posting_date": e.posting_date,
                     "account": e.account,
+                    "cost_center": e.cost_center or "",
                     "remarks": e.remarks or "",
                     "voucher_type": e.voucher_type,
                     "voucher_subtype": e.voucher_subtype or "",
@@ -216,7 +223,7 @@ def get_profit_and_loss_data(filters):
     entries = frappe.get_all("GL Entry",
         filters=common_filters,
         fields=[
-            "posting_date", "account", "remarks", "voucher_type", "voucher_subtype",
+            "posting_date", "account", "cost_center", "remarks", "voucher_type", "voucher_subtype",
             "voucher_no", "against", "party_type", "party", "debit", "credit"
         ],
         order_by="posting_date asc"
@@ -235,13 +242,14 @@ def get_profit_and_loss_data(filters):
 
         if amount != 0:
             row = {
-                "posting_date": e.posting_date,
-                "account": e.account,
-                "remarks": e.remarks or "",
-                "voucher_type": e.voucher_type,
-                "voucher_subtype": e.voucher_subtype or "",
-                "voucher_no": e.voucher_no,
-                "against": e.against or "",
+            "posting_date": e.posting_date,
+            "account": e.account,
+            "cost_center": e.cost_center or "",
+            "remarks": e.remarks or "",
+            "voucher_type": e.voucher_type,
+            "voucher_subtype": e.voucher_subtype or "",
+            "voucher_no": e.voucher_no,
+            "against": e.against or "",
                 "party_type": e.party_type or "",
                 "party": e.party or "",
                 "amount": amount
