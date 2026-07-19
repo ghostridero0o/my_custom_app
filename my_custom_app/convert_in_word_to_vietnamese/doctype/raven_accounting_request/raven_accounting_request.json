@@ -1,0 +1,41 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "format:ACC-REQ-{#####}",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "source_message", "source_channel", "proposal_message", "requested_by", "status",
+  "suggested_document_type", "transaction_type", "amount", "confidence", "extracted_data",
+  "target_doctype", "target_document", "created_by", "created_on", "error"
+ ],
+ "fields": [
+  {"fieldname":"source_message","fieldtype":"Link","label":"Source Message","options":"Raven Message","reqd":1,"unique":1},
+  {"fieldname":"source_channel","fieldtype":"Link","label":"Source Channel","options":"Raven Channel","reqd":1},
+  {"fieldname":"proposal_message","fieldtype":"Link","label":"Proposal Message","options":"Raven Message","read_only":1},
+  {"fieldname":"requested_by","fieldtype":"Link","label":"Requested By","options":"User","reqd":1},
+  {"fieldname":"status","fieldtype":"Select","label":"Status","options":"Detected\nAwaiting User\nEditing\nCreating\nCreated\nSubmitted\nIgnored\nFailed\nCancelled","reqd":1},
+  {"fieldname":"suggested_document_type","fieldtype":"Select","label":"Suggested Document Type","options":"Petty Expense\nPayment Entry\nJournal Entry"},
+  {"fieldname":"transaction_type","fieldtype":"Data","label":"Transaction Type"},
+  {"fieldname":"amount","fieldtype":"Currency","label":"Amount"},
+  {"fieldname":"confidence","fieldtype":"Float","label":"Confidence"},
+  {"fieldname":"extracted_data","fieldtype":"JSON","label":"Extracted Data","read_only":1},
+  {"fieldname":"target_doctype","fieldtype":"Link","label":"Target DocType","options":"DocType","read_only":1},
+  {"fieldname":"target_document","fieldtype":"Dynamic Link","label":"Target Document","options":"target_doctype","read_only":1},
+  {"fieldname":"created_by","fieldtype":"Link","label":"Created By","options":"User","read_only":1},
+  {"fieldname":"created_on","fieldtype":"Datetime","label":"Created On","read_only":1},
+  {"fieldname":"error","fieldtype":"Long Text","label":"Error","read_only":1}
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "module": "convert In word to Vietnamese",
+ "name": "Raven Accounting Request",
+ "permissions": [
+  {"read":1,"role":"Accounts User"},
+  {"read":1,"write":1,"role":"Accounts Manager"},
+  {"read":1,"write":1,"role":"System Manager"}
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

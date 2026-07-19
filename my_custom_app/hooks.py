@@ -146,7 +146,23 @@ doc_events = {
     },
     "Salary Slip": {
         "before_save": "my_custom_app.salary_slip.before_save"
-    } 
+    },
+    "Raven Message": {
+        "after_insert": "my_custom_app.raven.accounting_agent.on_raven_message",
+        "on_update": "my_custom_app.raven.accounting_agent.on_raven_message"
+    },
+    "Payment Entry": {
+        "on_submit": "my_custom_app.api.accounting_request.sync_document_status",
+        "on_cancel": "my_custom_app.api.accounting_request.sync_document_status"
+    },
+    "Journal Entry": {
+        "on_submit": "my_custom_app.api.accounting_request.sync_document_status",
+        "on_cancel": "my_custom_app.api.accounting_request.sync_document_status"
+    },
+    "Petty Expense": {
+        "on_submit": "my_custom_app.api.accounting_request.sync_document_status",
+        "on_cancel": "my_custom_app.api.accounting_request.sync_document_status"
+    }
     # "*": {
     #     "on_update": "method",
     #     "on_cancel": "method",
@@ -167,9 +183,10 @@ scheduler_events = {
         "0 8 * * *": [  # phút 0, giờ 8 sáng mỗi ngày
             "my_custom_app.scheduler.reminders.send_attendance_list"
         ],
-        "0 19 * * *": [
-            "my_custom_app.raven_cash_report.scheduled_send_daily_reports"
-        ],
+        # Tạm dừng báo cáo Raven lúc 19:00 từ Data Bot.
+        # "0 19 * * *": [
+        #     "my_custom_app.raven_cash_report.scheduled_send_daily_reports"
+        # ],
     }
 # 	"hourly": [
 # 		"my_custom_app.tasks.hourly"
