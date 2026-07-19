@@ -13,6 +13,13 @@ frappe.ui.form.on("Raven Accounting Request", {
 
 		if (["Awaiting User", "Editing", "Failed"].includes(frm.doc.status)) {
 			frm.add_custom_button(__("Tạo Bút Toán"), () => open_accounting_dialog(frm)).addClass("btn-primary");
+			const should_open_dialog = new URLSearchParams(window.location.search).get("open_accounting_dialog") === "1";
+			if (should_open_dialog && !frm.__accounting_dialog_opened) {
+				frm.__accounting_dialog_opened = true;
+				const clean_url = `${window.location.pathname}${window.location.hash}`;
+				window.history.replaceState({}, "", clean_url);
+				setTimeout(() => open_accounting_dialog(frm), 0);
+			}
 		}
 		if (frm.doc.target_doctype && frm.doc.target_document) {
 			frm.add_custom_button(__("Mở chứng từ"), () => {

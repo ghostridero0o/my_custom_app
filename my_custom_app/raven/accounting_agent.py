@@ -327,7 +327,9 @@ def _create_accounting_request(message, analysis, files):
 		message.channel_id,
 		f"AI phát hiện giao dịch <b>{escape(analysis.get('transaction_type') or '')}</b> "
 		f"với số tiền <b>{escape(str(analysis.get('amount') or 0))}</b>.<br>"
-		f"🟠 <b>Chờ tạo bút toán</b> — <a href=\"/app/raven-accounting-request/{request.name}\">Mở form tạo chứng từ</a>.",
+		f"🟠 <b>Chờ tạo bút toán</b> — "
+		f"<a href=\"/app/raven-accounting-request/{request.name}?open_accounting_dialog=1\">"
+		f"Mở form tạo chứng từ</a>.",
 	)
 	request.db_set("proposal_message", bot_message.name, update_modified=False)
 	return request

@@ -209,7 +209,8 @@ def _update_card(request, doc=None):
 	else:
 		message.text = (
 			f"🟠 <b>Chờ tạo bút toán</b> — "
-			f"<a href=\"/app/raven-accounting-request/{request.name}\">Mở form tạo chứng từ</a>."
+			f"<a href=\"/app/raven-accounting-request/{request.name}?open_accounting_dialog=1\">"
+			f"Mở form tạo chứng từ</a>."
 		)
 	message.flags.is_ai_streaming = True
 	message.save(ignore_permissions=True)
