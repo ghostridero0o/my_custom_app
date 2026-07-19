@@ -7,6 +7,16 @@ def get_settings():
 	return frappe.get_single("Raven Accounting Settings")
 
 
+def get_channel_settings(channel=None):
+	"""Return the accounting defaults for a Raven channel, with legacy fallback."""
+	settings = get_settings()
+	if channel:
+		for row in settings.get("channel_configurations") or []:
+			if row.channel == channel:
+				return row
+	return settings
+
+
 def expense_accounts(settings=None):
 	settings = settings or get_settings()
 	return {

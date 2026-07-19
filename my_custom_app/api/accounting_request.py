@@ -5,14 +5,21 @@ from frappe import _
 from frappe.utils import now_datetime
 
 from my_custom_app.raven.accounting_agent import _collect_files, _create_draft
-from my_custom_app.raven.settings import get_settings
+from my_custom_app.raven.settings import expense_accounts, get_channel_settings, get_settings
 
 
 @frappe.whitelist()
 def get_request(name: str):
 	request = _get_allowed_request(name)
 	data = _json(request.extracted_data)
-	data["company"] = _default_company()
+	channel_settings = get_channel_settings(request.source_channel)
+	data["company"] = _default_company(request.source_channel)
+	data["mode_of_payment"] = channel_settings.mode_of_payment or data.get("mode_of_payment")
+	data["cost_center"] = channel_settings.cost_center
+	data["expense_account"] = (
+		expense_accounts(channel_settings).get(data.get("expense_category"))
+		or channel_settings.other_expense_account
+	)
 	data["available_mode_of_payments"] = _available_mode_of_payments(data["company"])
 	data["reference_date"] = data.get("reference_date") or data.get("posting_date")
 	if data.get("mode_of_payment") and data["mode_of_payment"] not in data["available_mode_of_payments"]:
@@ -45,10 +52,12 @@ def create_entry(name: str, values=None):
 		"document_type", "transaction_type", "posting_date", "amount", "currency",
 		"party_type", "party", "mode_of_payment", "description", "expense_category",
 		"reference_no", "reference_date", "paid_from", "paid_to", "company",
+		"expense_account", "cost_center",
 	}
 	data.update({key: value for key, value in values.items() if key in allowed_fields})
 	_validate_form(data)
 	data["source_message"] = request.source_message
+	data["source_channel"] = request.source_channel
 
 	request.db_set("status", "Creating", update_modified=True)
 	try:
@@ -153,6 +162,11 @@ def _validate_form(data):
 		)
 		if frappe.db.get_value("Account", default_account, "account_type") not in {"Cash", "Bank"}:
 			frappe.throw(_("Mode of Payment {0} must use a default Cash or Bank account.").format(mode))
+	if data["document_type"] == "Petty Expense":
+		if not frappe.db.exists("Account", {"name": data.get("expense_account"), "company": data["company"], "is_group": 0}):
+			frappe.throw(_("Please select a valid Expense Account for company {0}.").format(data["company"]))
+		if not frappe.db.exists("Cost Center", {"name": data.get("cost_center"), "company": data["company"], "is_group": 0}):
+			frappe.throw(_("Please select a valid Cost Center for company {0}.").format(data["company"]))
 
 
 def _available_mode_of_payments(company):
@@ -182,9 +196,10 @@ def get_available_mode_of_payments(company):
 	return _available_mode_of_payments(company)
 
 
-def _default_company():
+def _default_company(channel=None):
 	return (
-		frappe.defaults.get_user_default("Company")
+		get_channel_settings(channel).company
+		or frappe.defaults.get_user_default("Company")
 		or get_settings().company
 		or frappe.defaults.get_global_default("company")
 	)

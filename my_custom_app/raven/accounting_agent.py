@@ -16,7 +16,7 @@ from pathlib import Path
 import frappe
 from frappe.utils import add_to_date, cint, flt, get_url, nowdate
 
-from my_custom_app.raven.settings import expense_accounts, get_settings
+from my_custom_app.raven.settings import expense_accounts, get_channel_settings, get_settings
 
 
 SUPPORTED_MESSAGE_TYPES = {"Text", "Image", "File"}
@@ -74,6 +74,7 @@ def process_message_bundle(message_name: str):
 			analysis = _analyse_with_ai(text, files)
 			analysis["source_message"] = bundle_id
 			analysis["source_messages"] = source_ids
+			analysis["source_channel"] = message.channel_id
 			_create_accounting_request(message, analysis, files)
 		except ClarificationRequired as exc:
 			_send_bot_message(message.channel_id, f"⚠️ AI chưa thể tạo chứng từ: {escape(str(exc))}")
@@ -100,6 +101,7 @@ def retry_as_accounting_request(message_name: str):
 	analysis = _analyse_with_ai("\n".join(row.content for row in messages if row.content), files)
 	analysis["source_message"] = messages[0].name
 	analysis["source_messages"] = [row.name for row in messages]
+	analysis["source_channel"] = message.channel_id
 	return _create_accounting_request(message, analysis, files).name
 
 
@@ -108,7 +110,10 @@ def _enabled() -> bool:
 
 
 def _is_accounting_channel(channel) -> bool:
-	configured_id = get_settings().channel
+	settings = get_settings()
+	if any(row.channel == channel.name for row in settings.get("channel_configurations") or []):
+		return True
+	configured_id = settings.channel
 	if configured_id:
 		return channel.name == configured_id
 	return (channel.channel_name or "").strip().lower() in DEFAULT_CHANNEL_NAMES
@@ -397,7 +402,7 @@ def _create_payment_entry(data):
 
 
 def _create_journal_entry(data):
-	settings = get_settings()
+	settings = get_channel_settings(data.get("source_channel"))
 	debit = settings.journal_debit_account
 	credit = settings.journal_credit_account
 	if not debit or not credit:
@@ -416,11 +421,11 @@ def _create_journal_entry(data):
 
 
 def _create_petty_expense(data):
-	settings = get_settings()
+	settings = get_channel_settings(data.get("source_channel"))
 	mapping = expense_accounts(settings)
-	expense_account = mapping.get(data.get("expense_category")) or mapping.get("other")
+	expense_account = data.get("expense_account") or mapping.get(data.get("expense_category")) or mapping.get("other")
 	mode_of_payment = data.get("mode_of_payment") or settings.mode_of_payment
-	cost_center = settings.cost_center
+	cost_center = data.get("cost_center") or settings.cost_center
 	if not expense_account or not mode_of_payment or not cost_center:
 		raise ClarificationRequired("Chưa cấu hình expense account, Mode of Payment hoặc Cost Center cho Petty Expense demo.")
 	meta = frappe.get_meta("Petty Expense")
@@ -435,7 +440,7 @@ def _create_petty_expense(data):
 		"cost_center": cost_center,
 	}
 	# Different Petty Expense apps may require these fields.
-	for fieldname, value in (("cost_center", settings.cost_center), ("petty_expense_type", settings.petty_expense_type)):
+	for fieldname, value in (("cost_center", cost_center), ("petty_expense_type", settings.petty_expense_type)):
 		if meta.has_field(fieldname) and value:
 			values[fieldname] = value
 	return frappe.get_doc(values)
@@ -445,7 +450,7 @@ def _company(data=None):
 	company = (
 		(data or {}).get("company")
 		or frappe.defaults.get_user_default("Company")
-		or get_settings().company
+		or get_channel_settings((data or {}).get("source_channel")).company
 		or frappe.defaults.get_global_default("company")
 	)
 	if not company:
@@ -508,7 +513,8 @@ def _send_result(channel_id, analysis, doc):
 
 
 def _send_bot_message(channel_id, text, message_json=None):
-	bot_name = get_settings().bot
+	channel_settings = get_channel_settings(channel_id)
+	bot_name = channel_settings.bot or get_settings().bot
 	bot_user = frappe.db.get_value("Raven Bot", bot_name, "raven_user") if bot_name else None
 	return frappe.get_doc({
 		"doctype": "Raven Message",
