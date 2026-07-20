@@ -5,7 +5,14 @@ from frappe import _
 from frappe.utils import now_datetime
 
 from my_custom_app.raven.accounting_agent import _collect_files, _create_draft
-from my_custom_app.raven.settings import expense_accounts, get_channel_settings, get_settings
+from my_custom_app.raven.settings import (
+	expense_accounts,
+	get_channel_settings,
+	get_company_cost_center,
+	get_settings,
+	resolve_account,
+	setting_value,
+)
 
 
 @frappe.whitelist()
@@ -14,18 +21,21 @@ def get_request(name: str):
 	data = _json(request.extracted_data)
 	channel_settings = get_channel_settings(request.source_channel)
 	data["company"] = _default_company(request.source_channel)
-	data["mode_of_payment"] = channel_settings.mode_of_payment or data.get("mode_of_payment")
-	data["cost_center"] = channel_settings.cost_center
-	data["expense_account"] = (
+	data["mode_of_payment"] = setting_value(channel_settings, "mode_of_payment") or data.get("mode_of_payment")
+	data["cost_center"] = get_company_cost_center(channel_settings, data["company"])
+	configured_expense = (
 		expense_accounts(channel_settings).get(data.get("expense_category"))
-		or channel_settings.other_expense_account
+		or setting_value(channel_settings, "other_expense_account")
 	)
+	data["expense_account"] = resolve_account(data["company"], configured_expense)
 	data["available_mode_of_payments"] = _available_mode_of_payments(data["company"])
 	data["reference_date"] = data.get("reference_date") or data.get("posting_date")
 	if data.get("mode_of_payment") and data["mode_of_payment"] not in data["available_mode_of_payments"]:
 		data["mode_of_payment"] = None
 	party_type = data.get("party_type")
-	if party_type and data.get("party") and not frappe.db.exists(party_type, data["party"]):
+	if not party_type:
+		data["party"] = None
+	elif data.get("party") and not frappe.db.exists(party_type, data["party"]):
 		data["party"] = None
 	data.update(
 		{
@@ -52,7 +62,7 @@ def create_entry(name: str, values=None):
 		"document_type", "transaction_type", "posting_date", "amount", "currency",
 		"party_type", "party", "mode_of_payment", "description", "expense_category",
 		"reference_no", "reference_date", "paid_from", "paid_to", "company",
-		"expense_account", "cost_center",
+		"expense_account", "cost_center", "debit_account", "credit_account",
 	}
 	data.update({key: value for key, value in values.items() if key in allowed_fields})
 	_validate_form(data)
@@ -111,7 +121,11 @@ def sync_document_status(doc, method=None):
 
 def _get_allowed_request(name):
 	request = frappe.get_doc("Raven Accounting Request", name)
-	if request.requested_by != frappe.session.user and "System Manager" not in frappe.get_roles():
+	roles = set(frappe.get_roles())
+	if (
+		request.requested_by != frappe.session.user
+		and not roles.intersection({"Accounts Manager", "System Manager"})
+	):
 		frappe.throw(_("You cannot act on this accounting request."), frappe.PermissionError)
 	return request
 
@@ -252,5 +266,10 @@ def _json(value):
 	if not value:
 		return {}
 	if isinstance(value, dict):
-		return value
-	return json.loads(value)
+		data = value
+	else:
+		data = json.loads(value)
+	return {
+		key: None if isinstance(item, str) and item.strip().lower() in {"null", "none"} else item
+		for key, item in data.items()
+	}

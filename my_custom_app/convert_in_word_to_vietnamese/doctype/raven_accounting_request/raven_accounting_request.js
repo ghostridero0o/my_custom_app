@@ -30,11 +30,21 @@ frappe.ui.form.on("Raven Accounting Request", {
 });
 
 async function open_accounting_dialog(frm) {
-	const response = await frappe.call({
-		method: "my_custom_app.api.accounting_request.get_request",
-		args: { name: frm.doc.name },
-		freeze: true,
-	});
+	let response;
+	try {
+		response = await frappe.call({
+			method: "my_custom_app.api.accounting_request.get_request",
+			args: { name: frm.doc.name },
+			freeze: true,
+		});
+	} catch (error) {
+		frappe.msgprint({
+			title: __("Không thể mở form tạo bút toán"),
+			message: error?.message || __("Vui lòng kiểm tra quyền người dùng và cấu hình Raven Accounting."),
+			indicator: "red",
+		});
+		return;
+	}
 	const data = response.message;
 	let available_modes = data.available_mode_of_payments || [];
 	let dialog;
@@ -42,17 +52,24 @@ async function open_accounting_dialog(frm) {
 	const update_company_filters = async () => {
 		const company = dialog.get_value("company");
 		dialog.set_value("mode_of_payment", "");
+		dialog.set_value("expense_account", "");
+		dialog.set_value("cost_center", "");
 		dialog.set_value("paid_from", "");
 		dialog.set_value("paid_to", "");
+		dialog.set_value("debit_account", "");
+		dialog.set_value("credit_account", "");
 		if (!company) {
 			available_modes = [];
 			return;
 		}
 		const result = await frappe.call({
-			method: "my_custom_app.api.accounting_request.get_available_mode_of_payments",
+			method: "my_custom_app.raven.settings.get_company_accounting_defaults",
 			args: { company },
 		});
-		available_modes = result.message || [];
+		const defaults = result.message || {};
+		available_modes = defaults.available_mode_of_payments || [];
+		dialog.set_value("mode_of_payment", defaults.mode_of_payment || "");
+		dialog.set_value("cost_center", defaults.cost_center || "");
 	};
 
 	dialog = new frappe.ui.Dialog({
@@ -75,6 +92,9 @@ async function open_accounting_dialog(frm) {
 			{ fieldname: "paid_to", fieldtype: "Link", label: __("Tài khoản nhận"), options: "Account", depends_on: "eval:doc.document_type == 'Payment Entry' && doc.transaction_type == 'Internal Transfer'", get_query: () => ({ filters: { company: dialog.get_value("company"), is_group: 0 } }) },
 			{ fieldname: "reference_no", fieldtype: "Data", label: __("Số tham chiếu"), depends_on: "eval:doc.document_type == 'Payment Entry'" },
 			{ fieldname: "reference_date", fieldtype: "Date", label: __("Ngày tham chiếu"), depends_on: "eval:doc.document_type == 'Payment Entry'" },
+			{ fieldname: "journal_section", fieldtype: "Section Break", label: __("Journal Entry"), depends_on: "eval:doc.document_type == 'Journal Entry'" },
+			{ fieldname: "debit_account", fieldtype: "Link", label: __("Tài khoản Nợ"), options: "Account", depends_on: "eval:doc.document_type == 'Journal Entry'", get_query: () => ({ filters: { company: dialog.get_value("company"), is_group: 0 } }) },
+			{ fieldname: "credit_account", fieldtype: "Link", label: __("Tài khoản Có"), options: "Account", depends_on: "eval:doc.document_type == 'Journal Entry'", get_query: () => ({ filters: { company: dialog.get_value("company"), is_group: 0 } }) },
 			{ fieldname: "description", fieldtype: "Small Text", label: __("Diễn giải"), reqd: 1 },
 		],
 		primary_action_label: __("Tạo chứng từ nháp"),
@@ -110,6 +130,8 @@ async function open_accounting_dialog(frm) {
 		paid_to: data.paid_to,
 		reference_no: data.reference_no,
 		reference_date: data.reference_date || data.posting_date,
+		debit_account: data.debit_account,
+		credit_account: data.credit_account,
 		description: data.description,
 	});
 }

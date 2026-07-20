@@ -10,13 +10,21 @@ import base64
 import json
 import mimetypes
 import re
+import time
 from html import escape
 from pathlib import Path
 
 import frappe
 from frappe.utils import add_to_date, cint, flt, get_url, nowdate
 
-from my_custom_app.raven.settings import expense_accounts, get_channel_settings, get_settings
+from my_custom_app.raven.settings import (
+	expense_accounts,
+	get_channel_settings,
+	get_company_cost_center,
+	get_settings,
+	resolve_account,
+	setting_value,
+)
 
 
 SUPPORTED_MESSAGE_TYPES = {"Text", "Image", "File"}
@@ -42,7 +50,8 @@ def on_raven_message(doc, method=None):
 		"my_custom_app.raven.accounting_agent.process_message_bundle",
 		queue="long",
 		enqueue_after_commit=True,
-		job_name=f"raven-accounting-{doc.channel_id}-{doc.owner}",
+		job_id=f"raven-accounting-{doc.channel_id}-{doc.owner}",
+		deduplicate=True,
 		message_name=doc.name,
 		at_front=False,
 	)
@@ -50,6 +59,9 @@ def on_raven_message(doc, method=None):
 
 def process_message_bundle(message_name: str):
 	"""Collect nearby messages, ask AI for JSON, then create a safe draft."""
+	# Raven stores an image upload and its explanation as separate messages. Give
+	# the user a short window to finish the pair before collecting the bundle.
+	time.sleep(8)
 	message = frappe.get_doc("Raven Message", message_name)
 	lock_name = f"raven-accounting:{message.channel_id}:{message.owner}"
 
@@ -204,9 +216,16 @@ def _analyse_with_ai(user_text: str, files: list[dict]) -> dict:
 	)
 	raw = response.choices[0].message.content or "{}"
 	data = json.loads(raw)
+	_normalise_null_values(data)
 	_apply_explicit_text_rules(data, user_text)
 	_validate_analysis(data)
 	return data
+
+
+def _normalise_null_values(data):
+	for key, value in data.items():
+		if isinstance(value, str) and value.strip().lower() in {"null", "none"}:
+			data[key] = None
 
 
 def _apply_explicit_text_rules(data: dict, user_text: str):
@@ -403,14 +422,23 @@ def _create_payment_entry(data):
 
 def _create_journal_entry(data):
 	settings = get_channel_settings(data.get("source_channel"))
-	debit = settings.journal_debit_account
-	credit = settings.journal_credit_account
+	company = _company(data)
+	debit = resolve_account(
+		company,
+		data.get("debit_account") or setting_value(settings, "journal_debit_account"),
+	)
+	credit = resolve_account(
+		company,
+		data.get("credit_account") or setting_value(settings, "journal_credit_account"),
+	)
 	if not debit or not credit:
-		raise ClarificationRequired("Chưa cấu hình debit/credit account cho Journal Entry demo.")
+		raise ClarificationRequired(
+			"Journal Entry cần tài khoản Nợ/Có trên form hoặc trong Raven Accounting Settings."
+		)
 	amount = flt(data["amount"])
 	doc = frappe.get_doc({
 		"doctype": "Journal Entry",
-		"company": _company(data),
+		"company": company,
 		"posting_date": data.get("posting_date") or nowdate(),
 		"voucher_type": "Journal Entry",
 		"user_remark": _remarks(data),
@@ -423,15 +451,17 @@ def _create_journal_entry(data):
 def _create_petty_expense(data):
 	settings = get_channel_settings(data.get("source_channel"))
 	mapping = expense_accounts(settings)
-	expense_account = data.get("expense_account") or mapping.get(data.get("expense_category")) or mapping.get("other")
-	mode_of_payment = data.get("mode_of_payment") or settings.mode_of_payment
-	cost_center = data.get("cost_center") or settings.cost_center
+	company = _company(data)
+	configured_expense = data.get("expense_account") or mapping.get(data.get("expense_category")) or mapping.get("other")
+	expense_account = resolve_account(company, configured_expense)
+	mode_of_payment = data.get("mode_of_payment") or setting_value(settings, "mode_of_payment")
+	cost_center = data.get("cost_center") or get_company_cost_center(settings, company)
 	if not expense_account or not mode_of_payment or not cost_center:
 		raise ClarificationRequired("Chưa cấu hình expense account, Mode of Payment hoặc Cost Center cho Petty Expense demo.")
 	meta = frappe.get_meta("Petty Expense")
 	values = {
 		"doctype": "Petty Expense",
-		"company": _company(data),
+		"company": company,
 		"date": data.get("posting_date") or nowdate(),
 		"amount": flt(data["amount"]),
 		"description": _remarks(data),

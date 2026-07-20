@@ -6,6 +6,18 @@ from my_custom_app.raven.settings import ensure_bot_membership
 
 
 class RavenAccountingSettings(Document):
+	def before_validate(self):
+		account_fields = (
+			"cash_account", "office_expense_account", "meal_expense_account",
+			"travel_expense_account", "other_expense_account",
+			"journal_debit_account", "journal_credit_account",
+		)
+		for row in [self, *self.channel_configurations]:
+			for fieldname in account_fields:
+				value = row.get(fieldname)
+				if value and frappe.db.exists("Account", value):
+					row.set(fieldname, frappe.db.get_value("Account", value, "account_number") or value)
+
 	def validate(self):
 		if not self.enabled:
 			return
