@@ -1,8 +1,9 @@
 import json
+import re
 
 import frappe
 from frappe import _
-from frappe.utils import now_datetime
+from frappe.utils import flt, get_number_format_info, now_datetime
 
 from my_custom_app.raven.accounting_agent import _collect_files, _create_draft
 from my_custom_app.raven.settings import (
@@ -65,6 +66,7 @@ def create_entry(name: str, values=None):
 		"expense_account", "cost_center", "debit_account", "credit_account",
 	}
 	data.update({key: value for key, value in values.items() if key in allowed_fields})
+	data["amount"] = _parse_amount(data.get("amount"), data.get("currency"))
 	_validate_form(data)
 	data["source_message"] = request.source_message
 	data["source_channel"] = request.source_channel
@@ -171,11 +173,19 @@ def _validate_form(data):
 			frappe.throw(
 				_("Mode of Payment {0} has no default account for company {1}.").format(mode, company)
 			)
-		default_account = frappe.db.get_value(
-			"Mode of Payment Account", {"parent": mode, "company": company}, "default_account"
-		)
+		default_account = _mode_of_payment_default_account(company, mode)
 		if frappe.db.get_value("Account", default_account, "account_type") not in {"Cash", "Bank"}:
 			frappe.throw(_("Mode of Payment {0} must use a default Cash or Bank account.").format(mode))
+		if (
+			data["document_type"] == "Payment Entry"
+			and data.get("transaction_type") == "Internal Transfer"
+			and data.get("paid_from") != default_account
+		):
+			frappe.throw(
+				_("Paid From must be {0}, the default account of Mode of Payment {1} for company {2}.").format(
+					default_account, mode, company
+				)
+			)
 	if data["document_type"] == "Petty Expense":
 		if not frappe.db.exists("Account", {"name": data.get("expense_account"), "company": data["company"], "is_group": 0}):
 			frappe.throw(_("Please select a valid Expense Account for company {0}.").format(data["company"]))
@@ -208,6 +218,23 @@ def get_available_mode_of_payments(company):
 	if not company or not frappe.db.exists("Company", company):
 		return []
 	return _available_mode_of_payments(company)
+
+
+@frappe.whitelist()
+def get_mode_of_payment_default_account(company, mode_of_payment):
+	if not company or not mode_of_payment:
+		return None
+	if mode_of_payment not in _available_mode_of_payments(company):
+		return None
+	return _mode_of_payment_default_account(company, mode_of_payment)
+
+
+def _mode_of_payment_default_account(company, mode_of_payment):
+	return frappe.db.get_value(
+		"Mode of Payment Account",
+		{"parent": mode_of_payment, "company": company},
+		"default_account",
+	)
 
 
 def _default_company(channel=None):
@@ -273,3 +300,22 @@ def _json(value):
 		key: None if isinstance(item, str) and item.strip().lower() in {"null", "none"} else item
 		for key, item in data.items()
 	}
+
+
+def _parse_amount(value, currency=None):
+	if isinstance(value, (int, float)):
+		return flt(value)
+	if value is None:
+		return 0
+	number_format = (
+		frappe.db.get_value("Currency", currency, "number_format") if currency else None
+	) or frappe.db.get_default("number_format") or "#,###.##"
+	decimal_sep, group_sep, _precision = get_number_format_info(number_format)
+	text = re.sub(r"[^0-9,\.\-]", "", str(value).strip())
+	if not decimal_sep:
+		return flt(text.replace(".", "").replace(",", ""))
+	if group_sep:
+		text = text.replace(group_sep, "")
+	if decimal_sep and decimal_sep != ".":
+		text = text.replace(decimal_sep, ".")
+	return flt(text)

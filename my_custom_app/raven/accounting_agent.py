@@ -393,7 +393,7 @@ def _create_payment_entry(data):
 		"remarks": _remarks(data),
 	}
 	if payment_type == "Internal Transfer":
-		paid_from = data.get("paid_from") or bank_account
+		paid_from = bank_account
 		paid_to = data.get("paid_to")
 		if not paid_from or not paid_to:
 			raise ClarificationRequired("Internal Transfer cần tài khoản chuyển đi và tài khoản nhận.")
