@@ -31,6 +31,7 @@ SUPPORTED_MESSAGE_TYPES = {"Text", "Image", "File"}
 SUPPORTED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".pdf"}
 DEFAULT_CHANNEL_NAMES = {"thu-chi", "thu chi", "thu–chi"}
 SOURCE_MARKER = "RAVEN-AI-SOURCE:"
+BUNDLE_WINDOW_SECONDS = 120
 
 
 def on_raven_message(doc, method=None):
@@ -50,7 +51,7 @@ def on_raven_message(doc, method=None):
 		"my_custom_app.raven.accounting_agent.process_message_bundle",
 		queue="long",
 		enqueue_after_commit=True,
-		job_id=f"raven-accounting-{doc.channel_id}-{doc.owner}",
+		job_id=f"raven-accounting-{doc.name}",
 		deduplicate=True,
 		message_name=doc.name,
 		at_front=False,
@@ -71,7 +72,7 @@ def process_message_bundle(message_name: str):
 			return
 
 		source_ids = sorted(row.name for row in messages)
-		bundle_id = messages[0].name
+		bundle_id = _bundle_id(messages)
 		if _already_processed(bundle_id):
 			return
 
@@ -111,7 +112,7 @@ def retry_as_accounting_request(message_name: str):
 	if not files and not _has_meaningful_text(messages):
 		frappe.throw("An accounting image or description is required.")
 	analysis = _analyse_with_ai("\n".join(row.content for row in messages if row.content), files)
-	analysis["source_message"] = messages[0].name
+	analysis["source_message"] = _bundle_id(messages)
 	analysis["source_messages"] = [row.name for row in messages]
 	analysis["source_channel"] = message.channel_id
 	return _create_accounting_request(message, analysis, files).name
@@ -132,22 +133,78 @@ def _is_accounting_channel(channel) -> bool:
 
 
 def _collect_bundle(message):
-	if message.message_type == "Text" and not _has_recent_file(message):
-		return [message]
-	start = add_to_date(message.creation, seconds=-120)
-	end = add_to_date(message.creation, seconds=120)
+	anchor = message
+	if message.message_type == "Text":
+		file_messages = _nearby_file_messages(message, BUNDLE_WINDOW_SECONDS)
+		if not file_messages:
+			return [message]
+		nearest_file = _nearest_message(message, file_messages)
+		anchor = frappe.get_doc("Raven Message", nearest_file.name)
+
+	start = add_to_date(anchor.creation, seconds=-BUNDLE_WINDOW_SECONDS)
+	end = add_to_date(anchor.creation, seconds=BUNDLE_WINDOW_SECONDS)
+	text_messages = frappe.get_all(
+		"Raven Message",
+		filters={
+			"channel_id": anchor.channel_id,
+			"owner": anchor.owner,
+			"is_bot_message": 0,
+			"message_type": "Text",
+			"creation": ["between", [start, end]],
+		},
+		fields=["name", "content", "file", "message_type", "creation"],
+		order_by="creation asc",
+	)
+	# Several receipts may be posted within the same two-minute window. Assign
+	# each explanation only to its closest attachment instead of copying all text
+	# into every AI request.
+	file_messages = _nearby_file_messages(anchor, BUNDLE_WINDOW_SECONDS * 2)
+	text_messages = [
+		row
+		for row in text_messages
+		if _nearest_message(row, file_messages).name == anchor.name
+	]
+	anchor_row = frappe._dict(
+		name=anchor.name,
+		content=anchor.content,
+		file=anchor.file,
+		message_type=anchor.message_type,
+		creation=anchor.creation,
+	)
+	return sorted([*text_messages, anchor_row], key=lambda row: row.creation)
+
+
+def _nearby_file_messages(message, window_seconds: int):
 	return frappe.get_all(
 		"Raven Message",
 		filters={
 			"channel_id": message.channel_id,
 			"owner": message.owner,
 			"is_bot_message": 0,
-			"message_type": ["in", list(SUPPORTED_MESSAGE_TYPES)],
-			"creation": ["between", [start, end]],
+			"message_type": ["in", ["Image", "File"]],
+			"file": ["is", "set"],
+			"creation": [
+				"between",
+				[
+					add_to_date(message.creation, seconds=-window_seconds),
+					add_to_date(message.creation, seconds=window_seconds),
+				],
+			],
 		},
-		fields=["name", "content", "file", "message_type", "creation"],
-		order_by="creation asc",
+		fields=["name", "creation"],
 	)
+
+
+def _nearest_message(message, candidates):
+	return min(
+		candidates,
+		key=lambda row: (abs((row.creation - message.creation).total_seconds()), row.creation, row.name),
+	)
+
+
+def _bundle_id(messages) -> str:
+	"""Use the attachment as the stable ID without merging adjacent receipts."""
+	return next((row.name for row in messages if row.message_type in {"Image", "File"}), messages[0].name)
 
 
 def _collect_files(messages):
@@ -167,22 +224,6 @@ def _collect_files(messages):
 				seen.add(file_url)
 				files.append({"url": file_url, "message": message.name})
 	return files
-
-
-def _has_recent_file(message) -> bool:
-	return bool(
-		frappe.db.exists(
-			"Raven Message",
-			{
-				"channel_id": message.channel_id,
-				"owner": message.owner,
-				"is_bot_message": 0,
-				"message_type": ["in", ["Image", "File"]],
-				"file": ["is", "set"],
-				"creation": ["between", [add_to_date(message.creation, seconds=-120), message.creation]],
-			},
-		)
-	)
 
 
 def _has_meaningful_text(messages) -> bool:
@@ -218,6 +259,7 @@ def _analyse_with_ai(user_text: str, files: list[dict]) -> dict:
 	data = json.loads(raw)
 	_normalise_null_values(data)
 	_apply_explicit_text_rules(data, user_text)
+	data["amount"] = _normalise_ai_amount(data.get("amount"), data.get("currency"))
 	_validate_analysis(data)
 	return data
 
@@ -254,6 +296,26 @@ def _extract_explicit_vnd_amount(text: str) -> float | None:
 		return None
 	normalised = matches[-1].replace(".", "").replace(",", "")
 	return flt(normalised) or None
+
+
+def _normalise_ai_amount(value, currency=None) -> float:
+	"""Accept numeric JSON and common formatted amounts returned by vision models."""
+	if isinstance(value, (int, float)):
+		return abs(flt(value))
+	text = re.sub(r"[^0-9,.\-]", "", str(value or "").strip())
+	if not text:
+		return 0
+	if (currency or "").upper() == "VND":
+		return abs(flt(text.replace(".", "").replace(",", "")))
+	if "." in text and "," in text:
+		decimal_separator = "." if text.rfind(".") > text.rfind(",") else ","
+		group_separator = "," if decimal_separator == "." else "."
+		text = text.replace(group_separator, "").replace(decimal_separator, ".")
+	elif text.count(".") > 1 or text.count(",") > 1:
+		text = text.replace(".", "").replace(",", "")
+	else:
+		text = text.replace(",", ".")
+	return abs(flt(text))
 
 
 def _accounting_prompt(user_text: str) -> str:
