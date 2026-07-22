@@ -210,6 +210,7 @@ scheduler_events = {
 override_whitelisted_methods = {
 	"erpnext.controllers.item_variant.create_variant": "my_custom_app.controllers.override.custom_create_variant",
 	"erpnext.controllers.item_variant.enqueue_multiple_variant_creation": "my_custom_app.controllers.override.custom_enqueue_multiple_variant_creation",
+	"erpnext.manufacturing.doctype.work_order.work_order.make_stock_entry": "my_custom_app.controllers.work_order.make_stock_entry",
     "hrms.hr.doctype.attendance.attendance.mark_bulk_attendance":"my_custom_app.controllers.attendance.mark_bulk_attendance",
 	"hrms.hr.doctype.employee_attendance_tool.employee_attendance_tool.mark_employee_attendance":"my_custom_app.controllers.attendance.mark_employee_attendance",
     "erpnext.accounts.utils.get_children": "my_custom_app.controllers.utils.get_children"
@@ -289,7 +290,8 @@ after_install = "my_custom_app.setup.install.after_install"
 doctype_js = {
     "Employee Attendance Tool" : "public/js/my.js",
     "Employee Incentive": "public/js/employee_incentive.js",
-    "Additional Salary": "public/js/additional_salary.js"
+    "Additional Salary": "public/js/additional_salary.js",
+    "Stock Entry": "public/js/stock_entry.js",
     }
 fixtures = [
 	{"dt": "Custom Field", "filters": [["module", "=","convert In word to Vietnamese"]]},

@@ -16,5 +16,16 @@ def get_custom_fields():
                 "reqd": 0,
                 "in_list_view": 0
             }
-        ]
+        ],
+        "Stock Entry": [
+            {
+                "fieldname": "custom_only_items_in_project",
+                "label": "Chỉ chọn item trong project này",
+                "fieldtype": "Check",
+                "insert_after": "items_section",
+                "default": "0",
+                "depends_on": "",
+                "description": "Chỉ hiển thị Item đã có phát sinh tồn kho thuộc Project đang chọn.",
+            }
+        ],
     }
