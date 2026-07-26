@@ -80,7 +80,6 @@ class CustomPayrollEntry(PayrollEntry):
 				"end_date": self.end_date,
 				"company": self.company,
 				"posting_date": self.posting_date,
-				"deduct_tax_for_unclaimed_employee_benefits": self.deduct_tax_for_unclaimed_employee_benefits,
 				"deduct_tax_for_unsubmitted_tax_exemption_proof": self.deduct_tax_for_unsubmitted_tax_exemption_proof,
 				"payroll_entry": self.name,
 				"exchange_rate": self.exchange_rate,
@@ -131,7 +130,14 @@ class CustomPayrollEntry(PayrollEntry):
 					ss.salary_structure,
 					ss.employee,
 				)
-				.where((ssd.parentfield == component_type) & (ss.name.isin([d.name for d in salary_slips])))
+				.where(
+					(ssd.parentfield == component_type)
+					& (ss.name.isin([d.name for d in salary_slips]))
+					& (
+						(ssd.do_not_include_in_total == 0)
+						| ((ssd.do_not_include_in_total == 1) & (ssd.do_not_include_in_accounts == 0))
+					)
+				)
 			).run(as_dict=True)
 
 			return salary_components
@@ -152,7 +158,14 @@ class CustomPayrollEntry(PayrollEntry):
 				sep.project,
 				sep.percentage
 			)
-			.where((ssd.parentfield == component_type) & (ss.name.isin([d.name for d in salary_slips])))
+			.where(
+				(ssd.parentfield == component_type)
+				& (ss.name.isin([d.name for d in salary_slips]))
+				& (
+					(ssd.do_not_include_in_total == 0)
+					| ((ssd.do_not_include_in_total == 1) & (ssd.do_not_include_in_accounts == 0))
+				)
+			)
 		).run(as_dict=True)
 
 		salary_components = []
@@ -185,9 +198,6 @@ class CustomPayrollEntry(PayrollEntry):
 			component_dict = {}
 
 			for item in salary_components:
-				if not self.should_add_component_to_accrual_jv(component_type, item):
-					continue
-
 				employee_cost_centers = self.get_payroll_cost_centers_for_employee(
 					item['employee'], item['salary_structure']
 				)
@@ -318,6 +328,7 @@ class CustomPayrollEntry(PayrollEntry):
 		accounting_dimensions,
 		precision,
 		payable_amount,
+		employee_wise_accounting_enabled,
 	):
 		# Earnings
 		for acc_cc, amount in earnings.items():
@@ -375,14 +386,24 @@ def create_salary_slips_for_employees_with_present_days(
 
 		employees = list(set(employees) - set(salary_slips_exist_for))
 		for emp in employees:
-			args.update(
-				{
-					"doctype": "Salary Slip",
-					"employee": emp,
-					"present_days": present_days_map.get(emp, 0),
-				}
-			)
-			frappe.get_doc(args).insert()
+			slip_args = {
+				"doctype": "Salary Slip",
+				"employee": emp,
+				"salary_slip_based_on_timesheet": args.get("salary_slip_based_on_timesheet"),
+				"payroll_frequency": args.get("payroll_frequency"),
+				"start_date": args.get("start_date"),
+				"end_date": args.get("end_date"),
+				"company": args.get("company"),
+				"posting_date": args.get("posting_date"),
+				"deduct_tax_for_unsubmitted_tax_exemption_proof": args.get(
+					"deduct_tax_for_unsubmitted_tax_exemption_proof"
+				),
+				"payroll_entry": args.get("payroll_entry"),
+				"exchange_rate": args.get("exchange_rate"),
+				"currency": args.get("currency"),
+				"present_days": present_days_map.get(emp, 0),
+			}
+			frappe.get_doc(slip_args).insert()
 
 			count += 1
 			if publish_progress:
@@ -403,11 +424,13 @@ def create_salary_slips_for_employees_with_present_days(
 			)
 
 	except Exception as e:
-		frappe.db.rollback()
+		if not frappe.in_test:
+			frappe.db.rollback()
 		log_payroll_failure("creation", payroll_entry, e)
 
 	finally:
-		frappe.db.commit()  # nosemgrep
+		if not frappe.in_test:
+			frappe.db.commit()  # nosemgrep
 		frappe.publish_realtime("completed_salary_slip_creation", user=frappe.session.user)
 
 
