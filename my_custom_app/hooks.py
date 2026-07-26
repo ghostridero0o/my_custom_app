@@ -213,7 +213,6 @@ override_whitelisted_methods = {
 	"erpnext.manufacturing.doctype.work_order.work_order.make_stock_entry": "my_custom_app.controllers.work_order.make_stock_entry",
     "hrms.hr.doctype.attendance.attendance.mark_bulk_attendance":"my_custom_app.controllers.attendance.mark_bulk_attendance",
 	"hrms.hr.doctype.employee_attendance_tool.employee_attendance_tool.mark_employee_attendance":"my_custom_app.controllers.attendance.mark_employee_attendance",
-    "erpnext.accounts.utils.get_children": "my_custom_app.controllers.utils.get_children"
 }
 #
 # each overriding function accepts a `data` argument;
