@@ -12,6 +12,14 @@ salary_slip = frappe.qb.DocType("Salary Slip")
 salary_detail = frappe.qb.DocType("Salary Detail")
 salary_component = frappe.qb.DocType("Salary Component")
 
+MAIN_SALARY_COMPONENT_PREFIXES = ("lương tháng", "lương công nhân")
+ALLOWANCE_AND_BONUS_COMPONENT_PREFIXES = (
+	"phụ cấp",
+	"thưởng thợ chính",
+	"bảo hiểm xã hội công ty đóng",
+)
+SOCIAL_INSURANCE_COMPONENT_PREFIXES = ("bảo hiểm xã hội",)
+
 
 def execute(filters=None):
 	if not filters:
@@ -27,7 +35,7 @@ def execute(filters=None):
 		return [], []
 
 	earning_types, ded_types = get_earning_and_deduction_types(salary_slips)
-	columns = get_columns(earning_types, ded_types)
+	columns = get_columns(earning_types, ded_types, filters.get("summarize_view"))
 
 	ss_earning_map = get_salary_slip_details(salary_slips, currency, company_currency, "earnings")
 	ss_ded_map = get_salary_slip_details(salary_slips, currency, company_currency, "deductions")
@@ -88,6 +96,25 @@ def execute(filters=None):
 				}
 			)
 
+		if filters.get("summarize_view"):
+			social_insurance = get_component_total(
+				ss_ded_map.get(ss.name, {}), SOCIAL_INSURANCE_COMPONENT_PREFIXES
+			)
+			row.update(
+				{
+					"monthly_salary": get_component_total(
+						ss_earning_map.get(ss.name, {}), MAIN_SALARY_COMPONENT_PREFIXES
+					),
+					"allowance_and_bonus": get_component_total(
+						ss_earning_map.get(ss.name, {}), ALLOWANCE_AND_BONUS_COMPONENT_PREFIXES
+					),
+					"social_insurance": social_insurance,
+					"advance_and_deduction": flt(row["total_deduction"]) - social_insurance,
+				}
+			)
+			if flt(row["monthly_salary"]) and flt(ss.present_days):
+				row["daily_salary"] = flt(row["monthly_salary"]) / flt(ss.present_days)
+
 		data.append(row)
 
 	return columns, data
@@ -103,18 +130,27 @@ def get_earning_and_deduction_types(salary_slips):
 	return sorted(salary_component_and_type[_("Earning")]), sorted(salary_component_and_type[_("Deduction")])
 
 
+def get_component_total(component_map, component_prefixes):
+	return sum(
+		flt(amount)
+		for component, amount in component_map.items()
+		if component.strip().casefold().startswith(component_prefixes)
+	)
+
+
 def update_column_width(ss, columns):
-	if ss.branch is not None:
-		columns[3].update({"width": 120})
-	if ss.department is not None:
-		columns[4].update({"width": 120})
-	if ss.designation is not None:
-		columns[5].update({"width": 120})
-	if ss.leave_without_pay is not None:
-		columns[9].update({"width": 120})
+	columns_by_fieldname = {column["fieldname"]: column for column in columns}
+	if ss.branch is not None and "branch" in columns_by_fieldname:
+		columns_by_fieldname["branch"].update({"width": 120})
+	if ss.department is not None and "department" in columns_by_fieldname:
+		columns_by_fieldname["department"].update({"width": 120})
+	if ss.designation is not None and "designation" in columns_by_fieldname:
+		columns_by_fieldname["designation"].update({"width": 120})
+	if ss.leave_without_pay is not None and "leave_without_pay" in columns_by_fieldname:
+		columns_by_fieldname["leave_without_pay"].update({"width": 120})
 
 
-def get_columns(earning_types, ded_types):
+def get_columns(earning_types, ded_types, summarize_view=False):
 	columns = [
 		{
 			"label": _("Salary Slip ID"),
@@ -201,12 +237,103 @@ def get_columns(earning_types, ded_types):
 			"width": 120,
 		},
 		{
-			"label": _("Số ngày chấm công"),
+			"label": _("Số ngày công"),
 			"fieldname": "present_days",
 			"fieldtype": "Float",
 			"width": 120,
 		},
 	]
+	if summarize_view:
+		columns.insert(
+			next(index for index, column in enumerate(columns) if column["fieldname"] == "present_days"),
+			{
+				"label": _("Lương/ngày"),
+				"fieldname": "daily_salary",
+				"fieldtype": "Currency",
+				"options": "currency",
+				"width": 120,
+			},
+		)
+		columns.extend(
+			[
+				{
+					"label": _("Lương tháng"),
+					"fieldname": "monthly_salary",
+					"fieldtype": "Currency",
+					"options": "currency",
+					"width": 120,
+				},
+				{
+					"label": _("Phụ cấp + thưởng"),
+					"fieldname": "allowance_and_bonus",
+					"fieldtype": "Currency",
+					"options": "currency",
+					"width": 120,
+				},
+				{
+					"label": _("Tổng thu nhập"),
+					"fieldname": "gross_pay",
+					"fieldtype": "Currency",
+					"options": "currency",
+					"width": 120,
+				},
+				{
+					"label": _("Bảo hiểm xã hội"),
+					"fieldname": "social_insurance",
+					"fieldtype": "Currency",
+					"options": "currency",
+					"width": 120,
+				},
+				{
+					"label": _("Tạm ứng + giảm trừ"),
+					"fieldname": "advance_and_deduction",
+					"fieldtype": "Currency",
+					"options": "currency",
+					"width": 120,
+				},
+				{
+					"label": _("Tổng giảm trừ"),
+					"fieldname": "total_deduction",
+					"fieldtype": "Currency",
+					"options": "currency",
+					"width": 120,
+				},
+				{
+					"label": _("Thực lĩnh"),
+					"fieldname": "net_pay",
+					"fieldtype": "Currency",
+					"options": "currency",
+					"width": 120,
+				},
+				{
+					"label": _("Đã Nhận CK"),
+					"fieldname": "custom_da_nhan_ck",
+					"fieldtype": "Currency",
+					"options": "currency",
+					"width": 120,
+				},
+				{
+					"label": _("Đối trừ"),
+					"fieldname": "custom_doi_tru",
+					"fieldtype": "Currency",
+					"options": "currency",
+					"width": 120,
+				},
+				{
+					"label": _("Currency"),
+					"fieldtype": "Data",
+					"fieldname": "currency",
+					"options": "Currency",
+					"hidden": 1,
+				},
+			]
+		)
+		return [
+			column
+			for column in columns
+			if column["fieldname"]
+			not in {"data_of_joining", "branch", "leave_without_pay", "absent_days", "payment_days"}
+		]
 
 	for earning in earning_types:
 		columns.append(
@@ -243,7 +370,7 @@ def get_columns(earning_types, ded_types):
 	columns.extend(
 		[
 			{
-				"label": _("Loan Repayment"),
+				"label": _("Tạm ứng"),
 				"fieldname": "total_loan_repayment",
 				"fieldtype": "Currency",
 				"options": "currency",
