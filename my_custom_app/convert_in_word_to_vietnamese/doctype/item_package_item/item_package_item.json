@@ -1,0 +1,19 @@
+{
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": ["item_code", "item_name", "qty", "description", "rate", "uom"],
+ "fields": [
+  {"fieldname": "item_code", "fieldtype": "Link", "in_list_view": 1, "label": "Mã hàng hóa", "options": "Item", "reqd": 1},
+  {"fetch_from": "item_code.item_name", "fetch_if_empty": 1, "fieldname": "item_name", "fieldtype": "Data", "in_list_view": 1, "label": "Tên hàng hóa", "read_only": 1},
+  {"fieldname": "qty", "fieldtype": "Float", "in_list_view": 1, "label": "Số lượng", "reqd": 1},
+  {"fetch_from": "item_code.description", "fetch_if_empty": 1, "fieldname": "description", "fieldtype": "Text Editor", "in_list_view": 1, "label": "Mô tả"},
+  {"fieldname": "rate", "fieldtype": "Float", "label": "Đơn giá"},
+  {"fetch_from": "item_code.stock_uom", "fetch_if_empty": 1, "fieldname": "uom", "fieldtype": "Link", "in_list_view": 1, "label": "Đơn vị tính", "options": "UOM", "read_only": 1}
+ ],
+ "idx": 1,
+ "istable": 1,
+ "module": "convert In word to Vietnamese",
+ "name": "Item Package Item",
+ "permissions": []
+}

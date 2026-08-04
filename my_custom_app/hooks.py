@@ -292,6 +292,7 @@ doctype_js = {
     "Employee Incentive": "public/js/employee_incentive.js",
     "Additional Salary": "public/js/additional_salary.js",
     "Stock Entry": "public/js/stock_entry.js",
+    "Delivery Note": "public/js/delivery_note.js",
     }
 fixtures = [
 	{"dt": "Custom Field", "filters": [["module", "=","convert In word to Vietnamese"]]},

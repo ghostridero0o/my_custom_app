@@ -1,0 +1,18 @@
+{
+ "actions": [],
+ "autoname": "field:group_item",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": ["group_item", "description", "items"],
+ "fields": [
+  {"fieldname": "group_item", "fieldtype": "Data", "in_global_search": 1, "in_list_view": 1, "label": "Gói hàng hóa", "reqd": 1, "unique": 1},
+  {"fieldname": "description", "fieldtype": "Data", "in_list_view": 1, "label": "Mô tả"},
+  {"fieldname": "items", "fieldtype": "Table", "label": "Hàng hóa", "options": "Item Package Item", "reqd": 1}
+ ],
+ "module": "convert In word to Vietnamese",
+ "name": "Item Package",
+ "permissions": [{"create": 1, "delete": 1, "read": 1, "write": 1, "role": "System Manager"}, {"create": 1, "read": 1, "write": 1, "role": "Stock Manager"}],
+ "sort_field": "modified",
+ "sort_order": "DESC"
+}
