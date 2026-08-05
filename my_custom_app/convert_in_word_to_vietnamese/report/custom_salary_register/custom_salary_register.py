@@ -12,10 +12,10 @@ salary_slip = frappe.qb.DocType("Salary Slip")
 salary_detail = frappe.qb.DocType("Salary Detail")
 salary_component = frappe.qb.DocType("Salary Component")
 
-MAIN_SALARY_COMPONENT_PREFIXES = ("lương tháng", "lương công nhân")
+MAIN_SALARY_COMPONENT_PREFIXES = ("lương",)
 ALLOWANCE_AND_BONUS_COMPONENT_PREFIXES = (
 	"phụ cấp",
-	"thưởng thợ chính",
+	"thưởng",
 	"bảo hiểm xã hội công ty đóng",
 )
 SOCIAL_INSURANCE_COMPONENT_PREFIXES = ("bảo hiểm xã hội",)

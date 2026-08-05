@@ -5,6 +5,7 @@ import copy
 
 import frappe
 from frappe import _
+from frappe.query_builder.functions import Cast_
 from erpnext.accounts.report.financial_statements import get_period_list
 
 
@@ -15,9 +16,13 @@ def execute(filters=None):
     if not company:
         frappe.throw(_("Please select a Company"))
 
+    filter_based_on = filters.get("filter_based_on") or "Fiscal Year"
+
     # Fiscal year filters (Link to Fiscal Year)
     from_fy = filters.get("from_fiscal_year")
     to_fy = filters.get("to_fiscal_year")
+    period_start_date = filters.get("period_start_date")
+    period_end_date = filters.get("period_end_date")
 
     # extra filters
     project = filters.get("project")
@@ -30,15 +35,18 @@ def execute(filters=None):
     periodicity = filters.get("periodicity") or "Yearly"
     selected_view = filters.get("selected_view") or "Report"
 
-    if not from_fy or not to_fy:
+    if filter_based_on == "Fiscal Year" and (not from_fy or not to_fy):
         frappe.throw(_("From Fiscal Year and To Fiscal Year are mandatory"))
+
+    if filter_based_on == "Date Range" and (not period_start_date or not period_end_date):
+        frappe.throw(_("Start Date and End Date are mandatory"))
 
     period_list = get_period_list(
         from_fy,
         to_fy,
-        None,
-        None,
-        "Fiscal Year",
+        period_start_date,
+        period_end_date,
+        filter_based_on,
         periodicity,
         accumulated_values=accumulated_values,
         company=company,
@@ -163,16 +171,25 @@ def execute(filters=None):
         return account_name or fallback
 
     def build_account_tree(parent_account, indent=1):
-        children = frappe.get_all(
-            "Account",
-            filters={
-                "company": company,
-                "parent_account": parent_account,
-                "disabled": 0,
-                "report_type": "Profit and Loss",
-            },
-            fields=["name", "account_name", "account_number", "is_group", "parent_account"],
-            order_by="CAST(account_number AS UNSIGNED), account_number ASC",
+        account = frappe.qb.DocType("Account")
+        children = (
+            frappe.qb.from_(account)
+            .select(
+                account.name,
+                account.account_name,
+                account.account_number,
+                account.is_group,
+                account.parent_account,
+            )
+            .where(
+                (account.company == company)
+                & (account.parent_account == parent_account)
+                & (account.disabled == 0)
+                & (account.report_type == "Profit and Loss")
+            )
+            .orderby(Cast_(account.account_number, "unsigned"))
+            .orderby(account.account_number)
+            .run(as_dict=True)
         )
 
         rows = []
