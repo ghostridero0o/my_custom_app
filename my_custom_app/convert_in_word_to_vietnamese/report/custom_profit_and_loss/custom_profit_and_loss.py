@@ -255,7 +255,39 @@ def execute(filters=None):
             parent_row["accounts"] = list(dict.fromkeys(leaf_accounts))
         return rows
 
+    def add_credit_balance_by_account_number(account_number, target_row):
+        """Add the net credit balance of an account (or its leaf children)."""
+        account = frappe.db.get_value(
+            "Account",
+            {"company": company, "account_number": str(account_number), "disabled": 0},
+            ["name", "is_group", "lft", "rgt"],
+            as_dict=True,
+        )
+        if not account:
+            return
+
+        account_filters = {"company": company, "disabled": 0, "is_group": 0}
+        if account.is_group:
+            account_filters["lft"] = ["between", [account.lft, account.rgt]]
+        else:
+            account_filters["name"] = account.name
+
+        leaf_accounts = frappe.get_all("Account", filters=account_filters, pluck="name")
+        for leaf_account in leaf_accounts:
+            # gl_amounts_for_account returns debit minus credit for balance-sheet accounts.
+            # 3389 is a liability account, so reverse it to get its net credit balance.
+            amounts = gl_amounts_for_account(leaf_account)
+            for p in period_list:
+                target_row[period_key(p)] -= amounts[period_key(p)]
+        if leaf_accounts:
+            target_row["accounts"] = leaf_accounts
+
     data = []
+
+    # 0. Doanh thu dự kiến, based on the net credit balance of customer advances.
+    r00 = new_row(_(u"0. Doanh thu dự kiến (Khách hàng trả tiền trước)"), code="00", indent=0, is_group=1)
+    data.append(r00)
+    add_credit_balance_by_account_number(3389, r00)
 
     # 1. Doanh thu bán hàng
     r01 = new_row(_(u"1. Doanh thu bán hàng và cung cấp dịch vụ"), code="01", indent=0, is_group=1)
@@ -331,6 +363,12 @@ def execute(filters=None):
     for p in period_list:
         r50[period_key(p)] = r30[period_key(p)] + r40[period_key(p)]
     data.append(r50)
+
+    # 15. Projected profit before tax adds customer advances to actual profit before tax.
+    r60 = new_row(_(u"15. Tổng lợi nhuận kế toán trước thuế dự kiến"), code="60", indent=0, is_group=0, quote_label=True)
+    for p in period_list:
+        r60[period_key(p)] = r50[period_key(p)] + r00[period_key(p)]
+    data.append(r60)
 
     # Lọc bỏ account con có tất cả giá trị = 0, nhưng giữ account cha
     filtered_data = []

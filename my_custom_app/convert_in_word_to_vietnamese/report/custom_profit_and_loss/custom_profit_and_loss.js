@@ -19,6 +19,15 @@ frappe.query_reports["Custom Profit And Loss"] = {
                 const filter_based_on = frappe.query_report.get_filter_value("filter_based_on");
                 if (
                     filter_based_on === "Date Range" &&
+                    !frappe.query_report.get_filter_value("period_start_date")
+                ) {
+                    frappe.query_report.set_filter_value(
+                        "period_start_date",
+                        frappe.datetime.year_start(frappe.datetime.get_today())
+                    );
+                }
+                if (
+                    filter_based_on === "Date Range" &&
                     !frappe.query_report.get_filter_value("period_end_date")
                 ) {
                     frappe.query_report.set_filter_value(
@@ -64,6 +73,7 @@ frappe.query_reports["Custom Profit And Loss"] = {
             label: __("From Fiscal Year"),
             fieldtype: "Link",
             options: "Fiscal Year",
+            default: new Date().getFullYear(),
             depends_on: "eval:doc.filter_based_on == 'Fiscal Year'",
             mandatory_depends_on: "eval:doc.filter_based_on == 'Fiscal Year'"
         },
