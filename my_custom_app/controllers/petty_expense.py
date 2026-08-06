@@ -18,7 +18,11 @@ class CustomPettyExpense(PettyExpense):
         jv_doc.entry_type = "Journal Entry"
         jv_doc.company = self.company
         jv_doc.posting_date = self.date
-        jv_doc.user_remark = self.description
+        # Journal Entry V16 no longer uses the hidden header-level
+        # ``user_remark`` to build the visible Remark. Mark this as a custom
+        # remark so ERPNext does not regenerate/overwrite it during submit.
+        jv_doc.custom_remark = 1
+        jv_doc.remark = self.description or f"Chi phí lặt vặt: {self.name}"
 
         # Dòng debit
         jv_doc.append(

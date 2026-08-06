@@ -107,6 +107,54 @@ class CustomPayrollEntry(PayrollEntry):
 			)
 			self.reload()
 
+	def make_journal_entry(
+		self,
+		accounts,
+		currencies,
+		payroll_payable_account=None,
+		voucher_type="Journal Entry",
+		user_remark="",
+		submitted_salary_slips: list | None = None,
+		submit_journal_entry=False,
+		employee_wise_accounting_enabled=False,
+	) -> str:
+		multi_currency = 0
+		if len(currencies) > 1:
+			multi_currency = 1
+
+		journal_entry = frappe.new_doc("Journal Entry")
+		journal_entry.voucher_type = voucher_type
+		journal_entry.user_remark = user_remark
+		journal_entry.custom_remark = 1
+		journal_entry.remark = user_remark
+		journal_entry.company = self.company
+		journal_entry.posting_date = self.posting_date
+		journal_entry.party_not_required = True if not employee_wise_accounting_enabled else False
+
+		journal_entry.set("accounts", accounts)
+		journal_entry.multi_currency = multi_currency
+
+		if voucher_type == "Journal Entry":
+			journal_entry.title = payroll_payable_account
+
+		journal_entry.save(ignore_permissions=True)
+
+		try:
+			if submit_journal_entry:
+				journal_entry.submit()
+
+			if submitted_salary_slips:
+				self.set_journal_entry_in_salary_slips(submitted_salary_slips, jv_name=journal_entry.name)
+
+		except Exception as e:
+			if type(e) in (str, list, tuple):
+				frappe.msgprint(e)
+
+			self.log_error("Journal Entry creation against Salary Slip failed")
+			raise
+
+		return journal_entry
+
 	def get_salary_components(self, component_type):
 		salary_slips = self.get_sal_slip_list(ss_status=1, as_dict=True)
 
