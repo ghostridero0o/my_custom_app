@@ -87,5 +87,12 @@ frappe.query_reports["Custom Salary Register"] = {
 			default: 1,
 			width: "100px",
 		},
+		{
+			fieldname: "project_cost_view",
+			label: __("Project Cost View"),
+			fieldtype: "Check",
+			default: 0,
+			width: "120px",
+		},
 	],
 };

@@ -34,6 +34,26 @@ def execute(filters=None):
 	if not salary_slips:
 		return [], []
 
+	if filters.get("project_cost_view"):
+		project_cost_map, projects = get_project_costs(salary_slips, currency, company_currency)
+		columns = get_project_cost_columns(projects)
+		data = []
+		for ss in salary_slips:
+			row = {
+				"salary_slip_id": ss.name,
+				"employee": ss.employee,
+				"employee_name": ss.employee_name,
+				"department": ss.department,
+				"designation": ss.designation,
+				"company": ss.company,
+				"currency": currency or company_currency,
+			}
+			for project in projects:
+				row[project["fieldname"]] = project_cost_map.get(ss.name, {}).get(project["name"], 0.0)
+			data.append(row)
+
+		return columns, data
+
 	earning_types, ded_types = get_earning_and_deduction_types(salary_slips)
 	columns = get_columns(earning_types, ded_types, filters.get("summarize_view"))
 
@@ -136,6 +156,140 @@ def get_component_total(component_map, component_prefixes):
 		for component, amount in component_map.items()
 		if component.strip().casefold().startswith(component_prefixes)
 	)
+
+
+def get_project_costs(salary_slips, currency, company_currency):
+	"""Allocate earnings to projects using the same Salary Slip percentages as Payroll Entry."""
+	employee_project = frappe.qb.DocType("Employee Project")
+	salary_slip_names = [ss.name for ss in salary_slips]
+
+	project_cost_rows = (
+		frappe.qb.from_(salary_slip)
+		.join(salary_detail)
+		.on(salary_slip.name == salary_detail.parent)
+		.join(employee_project)
+		.on(salary_slip.name == employee_project.parent)
+		.select(
+			salary_slip.name.as_("salary_slip"),
+			salary_slip.exchange_rate,
+			salary_detail.amount,
+			employee_project.project,
+			employee_project.percentage,
+		)
+		.where(
+			(salary_slip.name.isin(salary_slip_names))
+			& (salary_detail.parentfield == "earnings")
+			& (employee_project.project.isnotnull())
+			& (employee_project.project != "")
+			& (
+				(salary_detail.do_not_include_in_total == 0)
+				| (
+					(salary_detail.do_not_include_in_total == 1)
+					& (salary_detail.do_not_include_in_accounts == 0)
+				)
+			)
+		)
+	).run(as_dict=True)
+
+	project_cost_map = {}
+	project_names = set()
+	for row in project_cost_rows:
+		amount = flt(row.amount) * flt(row.percentage) / 100
+		if not amount:
+			continue
+		if currency == company_currency:
+			amount *= flt(row.exchange_rate) or 1
+		project_cost_map.setdefault(row.salary_slip, {}).setdefault(row.project, 0.0)
+		project_cost_map[row.salary_slip][row.project] += amount
+		project_names.add(row.project)
+
+	project_labels = dict(
+		frappe.get_all(
+			"Project",
+			filters={"name": ["in", list(project_names)]},
+			fields=["name", "project_name"],
+			as_list=True,
+		)
+	)
+	projects = []
+	for index, project in enumerate(
+		sorted(project_names, key=lambda name: (project_labels.get(name) or name).casefold()),
+		start=1,
+	):
+		projects.append(
+			{
+				"name": project,
+				"label": project_labels.get(project) or project,
+				"fieldname": f"project_cost_{index}",
+			}
+		)
+	return project_cost_map, projects
+
+
+def get_project_cost_columns(projects):
+	columns = [
+		{
+			"label": _("Salary Slip ID"),
+			"fieldname": "salary_slip_id",
+			"fieldtype": "Link",
+			"options": "Salary Slip",
+			"width": 150,
+		},
+		{
+			"label": _("Mã nhân viên"),
+			"fieldname": "employee",
+			"fieldtype": "Link",
+			"options": "Employee",
+			"width": 120,
+		},
+		{
+			"label": _("Tên nhân viên"),
+			"fieldname": "employee_name",
+			"fieldtype": "Data",
+			"width": 140,
+		},
+		{
+			"label": _("Phòng ban"),
+			"fieldname": "department",
+			"fieldtype": "Link",
+			"options": "Department",
+			"width": 120,
+		},
+		{
+			"label": _("Chức danh"),
+			"fieldname": "designation",
+			"fieldtype": "Link",
+			"options": "Designation",
+			"width": 120,
+		},
+		{
+			"label": _("Công ty"),
+			"fieldname": "company",
+			"fieldtype": "Link",
+			"options": "Company",
+			"width": 120,
+		},
+	]
+	for project in projects:
+		columns.append(
+			{
+				"label": project["label"],
+				"fieldname": project["fieldname"],
+				"fieldtype": "Currency",
+				"options": "currency",
+				"width": 140,
+			}
+		)
+	columns.append(
+		{
+			"label": _("Currency"),
+			"fieldname": "currency",
+			"fieldtype": "Data",
+			"options": "Currency",
+			"hidden": 1,
+		}
+	)
+	return columns
 
 
 def update_column_width(ss, columns):
