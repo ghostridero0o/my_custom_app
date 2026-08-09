@@ -15,10 +15,33 @@ frappe.query_reports["Delivery Note Item Summary"] = {
         options: "Customer"
       },
       {
-        fieldname: "project",
-        label: "Project",
+        fieldname: "item_group",
+        label: __("Item Group"),
         fieldtype: "Link",
-        options: "Project"
+        options: "Item Group"
+      },
+      {
+        fieldname: "item_code",
+        label: __("Item"),
+        fieldtype: "MultiSelectList",
+        options: "Item",
+        get_data: function (txt) {
+          const item_group = frappe.query_report.get_filter_value("item_group");
+          return frappe.db.get_link_options("Item", txt, {
+            ...(item_group && { item_group })
+          });
+        }
+      },
+      {
+        fieldname: "project",
+        label: __("Project"),
+        fieldtype: "MultiSelectList",
+        options: "Project",
+        get_data: function (txt) {
+          return frappe.db.get_link_options("Project", txt, {
+            company: frappe.query_report.get_filter_value("company")
+          });
+        }
       },
       {
         fieldname: "view_mode",
@@ -29,4 +52,3 @@ frappe.query_reports["Delivery Note Item Summary"] = {
       }
     ]
   };
-  

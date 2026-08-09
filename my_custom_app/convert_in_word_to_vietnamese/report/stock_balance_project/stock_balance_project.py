@@ -23,16 +23,29 @@ class StockBalanceProjectFilter(TypedDict):
     from_date: str
     to_date: str
     item_group: str | None
-    item: str | None
+    item_code: str | list[str] | None
     warehouse: str | None
     warehouse_type: str | None
-    project: str | None
+    project: str | list[str] | None
     include_uom: str | None  # include extra info in converted UOM
     show_stock_ageing_data: bool
     show_variant_attributes: bool
 
 
 SLEntry = dict[str, Any]
+
+
+def normalize_multiselect(value) -> list[str]:
+    if not value:
+        return []
+
+    if isinstance(value, str):
+        value = frappe.parse_json(value) if value.startswith("[") else [value]
+
+    if isinstance(value, (list, tuple, set)):
+        return [item for item in value if item]
+
+    return [value]
 
 
 def execute(filters: StockBalanceProjectFilter | None = None):
@@ -302,7 +315,11 @@ class StockBalanceProjectReport:
 
         for filter_field, table_field in filter_field_mapping.items():
             if self.filters.get(filter_field) and table_field in existing_fields:
-                query = query.where(table[table_field] == self.filters.get(filter_field))
+                if filter_field in {"item_code", "project"}:
+                    filter_values = normalize_multiselect(self.filters.get(filter_field))
+                    query = query.where(table[table_field].isin(filter_values))
+                else:
+                    query = query.where(table[table_field] == self.filters.get(filter_field))
 
         return query.run(as_dict=True)
 
@@ -353,8 +370,8 @@ class StockBalanceProjectReport:
         self.sle_query = query
 
     def apply_project_filters(self, query, sle):
-        if self.filters.get("project"):
-            query = query.where(sle.project == self.filters.get("project"))
+        if projects := normalize_multiselect(self.filters.get("project")):
+            query = query.where(sle.project.isin(projects))
         return query
 
     def apply_inventory_dimensions_filters(self, query, sle):
@@ -394,7 +411,8 @@ class StockBalanceProjectReport:
             if not self.filters.get(field):
                 continue
             elif field == "item_code":
-                query = query.where(item_table.name == self.filters.get(field))
+                item_codes = normalize_multiselect(self.filters.get(field))
+                query = query.where(item_table.name.isin(item_codes))
             else:
                 query = query.where(item_table[field] == self.filters.get(field))
 

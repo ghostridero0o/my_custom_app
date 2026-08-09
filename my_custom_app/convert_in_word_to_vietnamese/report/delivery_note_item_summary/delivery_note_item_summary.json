@@ -25,8 +25,24 @@
    "wildcard_filter": 0
   },
   {
-   "fieldname": "project",
+   "fieldname": "item_group",
    "fieldtype": "Link",
+   "label": "Item Group",
+   "mandatory": 0,
+   "options": "Item Group",
+   "wildcard_filter": 0
+  },
+  {
+   "fieldname": "item_code",
+   "fieldtype": "MultiSelectList",
+   "label": "Item",
+   "mandatory": 0,
+   "options": "Item",
+   "wildcard_filter": 0
+  },
+  {
+   "fieldname": "project",
+   "fieldtype": "MultiSelectList",
    "label": "Project",
    "mandatory": 0,
    "options": "Project",

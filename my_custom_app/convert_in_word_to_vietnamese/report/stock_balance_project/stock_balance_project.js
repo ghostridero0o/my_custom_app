@@ -37,19 +37,15 @@ frappe.query_reports["Stock Balance Project"] = {
 		{
 			fieldname: "item_code",
 			label: __("Item"),
-			fieldtype: "Link",
+			fieldtype: "MultiSelectList",
 			width: "80",
 			options: "Item",
-			get_query: function () {
-				let item_group = frappe.query_report.get_filter_value("item_group");
-
-				return {
-					query: "erpnext.controllers.queries.item_query",
-					filters: {
-						...(item_group && { item_group }),
-						is_stock_item: 1,
-					},
-				};
+			get_data: function (txt) {
+				const item_group = frappe.query_report.get_filter_value("item_group");
+				return frappe.db.get_link_options("Item", txt, {
+					...(item_group && { item_group }),
+					is_stock_item: 1,
+				});
 			},
 		},
 		{
@@ -80,16 +76,14 @@ frappe.query_reports["Stock Balance Project"] = {
 		{
 			fieldname: "project",
 			label: __("Project"),
-			fieldtype: "Link",
+			fieldtype: "MultiSelectList",
 			width: "80",
 			options: "Project",
-			get_query: () => {
-				let company = frappe.query_report.get_filter_value("company");
-				return {
-					filters: {
-						...(company && { company }),
-					},
-				};
+			get_data: function (txt) {
+				const company = frappe.query_report.get_filter_value("company");
+				return frappe.db.get_link_options("Project", txt, {
+					...(company && { company }),
+				});
 			},
 		},
 		{
@@ -126,7 +120,7 @@ frappe.query_reports["Stock Balance Project"] = {
 			fieldname: "include_zero_stock_items",
 			label: __("Include Zero Stock Items"),
 			fieldtype: "Check",
-			default: 0,
+			default: 1,
 		},
 		{
 			fieldname: "show_dimension_wise_stock",

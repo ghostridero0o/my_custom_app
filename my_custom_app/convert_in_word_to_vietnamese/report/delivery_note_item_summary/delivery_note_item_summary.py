@@ -1,7 +1,49 @@
 import frappe
 from frappe.utils import flt
+from frappe.utils.nestedset import get_descendants_of
+
+
+def normalize_multiselect(value):
+    if not value:
+        return []
+
+    if isinstance(value, str):
+        value = frappe.parse_json(value) if value.startswith("[") else [value]
+
+    if isinstance(value, (list, tuple, set)):
+        return [item for item in value if item]
+
+    return [value]
+
+
+def get_conditions(filters):
+    conditions = ["dn.docstatus = 1"]
+    values = dict(filters)
+
+    if filters.get("company"):
+        conditions.append("dn.company = %(company)s")
+    if filters.get("customer"):
+        conditions.append("dn.customer = %(customer)s")
+
+    if item_group := filters.get("item_group"):
+        item_groups = get_descendants_of("Item Group", item_group, ignore_permissions=True)
+        values["item_groups"] = tuple([item_group, *item_groups])
+        conditions.append("dni.item_group IN %(item_groups)s")
+
+    if item_codes := normalize_multiselect(filters.get("item_code")):
+        values["item_codes"] = tuple(item_codes)
+        conditions.append("dni.item_code IN %(item_codes)s")
+
+    if projects := normalize_multiselect(filters.get("project")):
+        values["projects"] = tuple(projects)
+        conditions.append(
+            "COALESCE(NULLIF(dni.project, ''), NULLIF(dn.project, '')) IN %(projects)s"
+        )
+
+    return " AND ".join(conditions), values
 
 def execute(filters=None):
+    filters = frappe._dict(filters or {})
     view_mode = filters.get("view_mode", "By Item")
     if view_mode == "By Delivery Date":
         return get_data_by_delivery_date(filters)
@@ -20,13 +62,7 @@ def get_data_by_item(filters):
         
     ]
 
-    conditions = " AND dn.docstatus = 1"
-    if filters.get("company"):
-        conditions += " AND dn.company = %(company)s"
-    if filters.get("customer"):
-        conditions += " AND dn.customer = %(customer)s"
-    if filters.get("project"):
-        conditions += " AND dn.project = %(project)s"
+    conditions, values = get_conditions(filters)
 
     data = frappe.db.sql(f"""
         SELECT
@@ -36,9 +72,9 @@ def get_data_by_item(filters):
             SUM(dni.amount) AS total_amount
         FROM `tabDelivery Note` dn
         JOIN `tabDelivery Note Item` dni ON dni.parent = dn.name
-        WHERE 1=1 {conditions}
+        WHERE {conditions}
         GROUP BY dni.item_code
-    """, filters, as_dict=1)
+    """, values, as_dict=1)
 
     for row in data:
         row["rate"] = flt(row["total_amount"]) / flt(row["total_qty"]) if row["total_qty"] else 0
@@ -46,21 +82,15 @@ def get_data_by_item(filters):
     return columns, data
 
 def get_data_by_delivery_date(filters):
-    conditions = " AND dn.docstatus = 1"
-    if filters.get("company"):
-        conditions += " AND dn.company = %(company)s"
-    if filters.get("customer"):
-        conditions += " AND dn.customer = %(customer)s"
-    if filters.get("project"):
-        conditions += " AND dn.project = %(project)s"
+    conditions, values = get_conditions(filters)
 
     date_list = frappe.db.sql(f"""
         SELECT DISTINCT dn.posting_date
         FROM `tabDelivery Note` dn
         JOIN `tabDelivery Note Item` dni ON dni.parent = dn.name
-        WHERE 1=1 {conditions}
+        WHERE {conditions}
         ORDER BY dn.posting_date DESC
-    """, filters)
+    """, values)
 
     date_list = [d[0].strftime('%d-%m-%Y') for d in date_list]
 
@@ -80,9 +110,9 @@ def get_data_by_delivery_date(filters):
             SUM(dni.qty) as qty
         FROM `tabDelivery Note` dn
         JOIN `tabDelivery Note Item` dni ON dni.parent = dn.name
-        WHERE 1=1 {conditions}
+        WHERE {conditions}
         GROUP BY dni.item_code, dn.posting_date
-    """, filters, as_dict=1)
+    """, values, as_dict=1)
 
     result_map = {}
     for row in raw_data:
@@ -100,22 +130,16 @@ def get_data_by_delivery_date(filters):
     return columns, list(result_map.values())
 
 def get_data_by_delivery_note(filters):
-    conditions = " AND dn.docstatus = 1"
-    if filters.get("company"):
-        conditions += " AND dn.company = %(company)s"
-    if filters.get("customer"):
-        conditions += " AND dn.customer = %(customer)s"
-    if filters.get("project"):
-        conditions += " AND dn.project = %(project)s"
+    conditions, values = get_conditions(filters)
 
     # Lấy danh sách Delivery Note theo thứ tự mới nhất
     dn_list = frappe.db.sql(f"""
         SELECT DISTINCT dn.name
         FROM `tabDelivery Note` dn
         JOIN `tabDelivery Note Item` dni ON dni.parent = dn.name
-        WHERE 1=1 {conditions}
+        WHERE {conditions}
         ORDER BY dn.posting_date DESC
-    """, filters)
+    """, values)
     dn_list = [d[0] for d in dn_list]
 
     # Khai báo cột
@@ -142,9 +166,9 @@ def get_data_by_delivery_note(filters):
             SUM(dni.qty) AS qty
         FROM `tabDelivery Note` dn
         JOIN `tabDelivery Note Item` dni ON dni.parent = dn.name
-        WHERE 1=1 {conditions}
+        WHERE {conditions}
         GROUP BY dni.item_code, dn.name
-    """, filters, as_dict=1)
+    """, values, as_dict=1)
 
     # Dữ liệu tổng hợp theo item
     result_map = {}
@@ -167,4 +191,3 @@ def get_data_by_delivery_note(filters):
         """
 
     return columns, list(result_map.values())
-

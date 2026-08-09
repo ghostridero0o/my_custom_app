@@ -6,4 +6,5 @@ my_custom_app.patches.rename_monthly_attendance_report
 [post_model_sync]
 my_custom_app.patches.bclc_tt_settings_defaults
 my_custom_app.patches.add_stock_entry_project_item_filter
+my_custom_app.patches.disable_stock_balance_project_prepared_report
 # Patches added in this section will be executed after doctypes are migrated
