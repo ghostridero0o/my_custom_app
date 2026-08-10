@@ -143,4 +143,4 @@ frappe.query_reports["Stock Balance Project"] = {
 	},
 };
 
-erpnext.utils.add_inventory_dimensions("Stock Balance", 8);
+erpnext.utils.add_inventory_dimensions("Stock Balance Project", 8);
