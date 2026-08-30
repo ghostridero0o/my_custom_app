@@ -4,6 +4,7 @@
 
 import frappe
 from frappe.utils import flt
+from pypika.terms import ExistsCriterion
 
 from erpnext.accounts.report.accounts_receivable.accounts_receivable import ReceivablePayableReport
 
@@ -18,8 +19,39 @@ def execute(filters=None):
 
 class CustomAccountsPayableReport(ReceivablePayableReport):
 	def prepare_conditions(self):
+		project = self.filters.pop("project", None)
 		super().prepare_conditions()
-		self.add_project_filter()
+
+		if project:
+			self.filters.project = project
+			self.add_project_filter(project)
+
+	def add_project_filter(self, project):
+		projects = list(project) if isinstance(project, (list, tuple, set)) else [project]
+		gle = frappe.qb.DocType("GL Entry")
+		matching_gl_entry = (
+			frappe.qb.from_(gle)
+			.select(gle.name)
+			.where(
+				(gle.company == self.ple.company)
+				& (gle.account == self.ple.account)
+				& (gle.voucher_type == self.ple.voucher_type)
+				& (gle.voucher_no == self.ple.voucher_no)
+				& (gle.party_type == self.ple.party_type)
+				& (gle.party == self.ple.party)
+				& (gle.project.isin(projects))
+				& (gle.is_cancelled == 0)
+			)
+		)
+		self.qb_selection_filter.append(ExistsCriterion(matching_gl_entry))
+
+	def append_row(self, row):
+		super().append_row(row)
+		project = self.filters.get("project")
+		if isinstance(project, str):
+			row.project = project
+		elif isinstance(project, (list, tuple, set)) and len(project) == 1:
+			row.project = next(iter(project))
 
 	def has_ledger_activity(self, row):
 		precision = self.currency_precision
@@ -82,36 +114,3 @@ class CustomAccountsPayableReport(ReceivablePayableReport):
 			self.append_subtotal_row(self.previous_party)
 			if self.data:
 				self.data.append(self.total_row_map.get("Total", {}))
-
-	def add_project_filter(self):
-		project = self.filters.get("project")
-		if not project:
-			return
-
-		if isinstance(project, (list, tuple, set)):
-			projects = list(project)
-		else:
-			projects = [project]
-
-		invoices = frappe.get_list(
-			"Purchase Invoice",
-			filters={
-				"project": ("in", projects),
-				"posting_date": ("<=", self.filters.report_date),
-				"company": self.filters.company,
-				"docstatus": 1,
-			},
-			pluck="name",
-		)
-
-		if not invoices:
-			self.qb_selection_filter.append(self.ple.name.isnull())
-			return
-
-		self.qb_selection_filter.append(
-			((self.ple.voucher_type == "Purchase Invoice") & (self.ple.voucher_no.isin(invoices)))
-			| (
-				(self.ple.against_voucher_type == "Purchase Invoice")
-				& (self.ple.against_voucher_no.isin(invoices))
-			)
-		)
