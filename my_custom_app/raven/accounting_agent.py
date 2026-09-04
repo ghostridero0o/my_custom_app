@@ -422,6 +422,7 @@ def _create_accounting_request(message, analysis, files):
 
 
 def _create_payment_entry(data):
+	from erpnext.accounts.party import get_party_account
 	from erpnext.accounts.utils import get_account_currency
 
 	payment_type = data.get("transaction_type") if data.get("transaction_type") in {"Pay", "Receive", "Internal Transfer"} else "Pay"
@@ -452,7 +453,7 @@ def _create_payment_entry(data):
 		"received_amount": flt(data["amount"]),
 		"reference_no": data.get("reference_no") or f"AI-{data['source_message']}",
 		"reference_date": data.get("reference_date") or data.get("posting_date") or nowdate(),
-		"remarks": _remarks(data),
+		"custom_remarks": 1,
 	}
 	if payment_type == "Internal Transfer":
 		paid_from = bank_account
@@ -465,6 +466,7 @@ def _create_payment_entry(data):
 			"paid_from_account_currency": get_account_currency(paid_from),
 			"paid_to_account_currency": get_account_currency(paid_to),
 		})
+		remarks_currency = values["paid_from_account_currency"]
 	elif payment_type == "Pay":
 		values.update({
 			"party_type": party_type,
@@ -472,6 +474,7 @@ def _create_payment_entry(data):
 			"paid_from": bank_account,
 			"paid_from_account_currency": get_account_currency(bank_account),
 		})
+		remarks_currency = values["paid_from_account_currency"]
 	else:
 		values.update({
 			"party_type": party_type,
@@ -479,6 +482,18 @@ def _create_payment_entry(data):
 			"paid_to": bank_account,
 			"paid_to_account_currency": get_account_currency(bank_account),
 		})
+		party_account = get_party_account(party_type, party, company)
+		remarks_currency = get_account_currency(party_account) if party_account else data.get("currency")
+
+	values["remarks"] = _payment_entry_remarks(
+		payment_type=payment_type,
+		amount=values["paid_amount"] if payment_type != "Receive" else values["received_amount"],
+		currency=remarks_currency,
+		paid_from=values.get("paid_from"),
+		paid_to=values.get("paid_to"),
+		party_name=_party_display_name(party_type, party),
+		source_message=data["source_message"],
+	)
 	return frappe.get_doc(values)
 
 
@@ -556,6 +571,35 @@ def _resolve_link(doctype, value):
 	if frappe.db.exists(doctype, value):
 		return value
 	return frappe.db.get_value(doctype, {"name": ["like", value]})
+
+
+def _party_display_name(party_type, party):
+	if not party_type or not party:
+		return ""
+	name_field = {
+		"Customer": "customer_name",
+		"Supplier": "supplier_name",
+		"Employee": "employee_name",
+	}.get(party_type)
+	return (frappe.db.get_value(party_type, party, name_field) if name_field else None) or party
+
+
+def _payment_entry_remarks(payment_type, amount, currency, paid_from, paid_to, party_name, source_message):
+	amount = flt(amount)
+	formatted_amount = str(int(amount)) if amount.is_integer() else f"{amount:.9f}".rstrip("0").rstrip(".")
+	currency = currency or ""
+	paid_from = paid_from or ""
+	paid_to = paid_to or ""
+	party_name = party_name or ""
+
+	if payment_type == "Internal Transfer":
+		text = f"Internal Transfer {formatted_amount} {currency} from {paid_from} to {paid_to}"
+	elif payment_type == "Receive":
+		text = f"Received {formatted_amount} {currency} from {party_name} to {paid_to}"
+	else:
+		text = f"Paid {formatted_amount} {currency} from {paid_from} to {party_name}"
+
+	return f"{text}\n{SOURCE_MARKER}{source_message}"
 
 
 def _remarks(data):

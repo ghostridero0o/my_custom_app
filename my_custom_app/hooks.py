@@ -289,7 +289,6 @@ after_install = "my_custom_app.setup.install.after_install"
 
 doctype_js = {
     "Employee Attendance Tool" : "public/js/my.js",
-    "Employee Incentive": "public/js/employee_incentive.js",
     "Additional Salary": "public/js/additional_salary.js",
     "Stock Entry": "public/js/stock_entry.js",
     "Delivery Note": "public/js/delivery_note.js",
