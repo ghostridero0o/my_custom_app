@@ -1,0 +1,76 @@
+{
+ "creation": "2025-07-19 01:50:26.819140",
+ "doctype": "Report",
+ "filters": [
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company",
+   "mandatory": 1
+  },
+  {
+   "fieldname": "finance_book",
+   "fieldtype": "Link",
+   "label": "Finance Book",
+   "options": "Finance Book"
+  },
+  {
+   "fieldname": "fiscal_year",
+   "fieldtype": "Link",
+   "label": "Fiscal Year",
+   "options": "Fiscal Year"
+  },
+  {
+   "fieldname": "from_date",
+   "fieldtype": "Date",
+   "label": "From Date",
+   "mandatory": 1
+  },
+  {
+   "fieldname": "to_date",
+   "fieldtype": "Date",
+   "label": "To Date",
+   "mandatory": 1
+  },
+  {
+   "fieldname": "project",
+   "fieldtype": "MultiSelectList",
+   "label": "Project",
+   "options": "Project"
+  },
+  {
+   "fieldname": "hide_projects_below",
+   "fieldtype": "Check",
+   "label": "Ẩn các công trình <"
+  },
+  {
+   "fieldname": "project_threshold",
+   "fieldtype": "Select",
+   "label": "Ngưỡng",
+   "options": "10000000\n50000000\n100000000\n300000000\n500000000"
+  },
+  {
+   "fieldname": "cost_center",
+   "fieldtype": "Link",
+   "label": "Cost Center",
+   "options": "Cost Center"
+  },
+  {
+   "fieldname": "view_type",
+   "fieldtype": "Select",
+   "label": "View Type",
+   "options": "Profit and Loss\nCash Flow",
+   "mandatory": 1
+  }
+ ],
+ "is_standard": "Yes",
+ "modified": "2026-09-03 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "convert In word to Vietnamese",
+ "name": "Project Financial Summary",
+ "prepared_report": 0,
+ "ref_doctype": "GL Entry",
+ "report_name": "Project Financial Summary",
+ "report_type": "Script Report"
+}
