@@ -32,6 +32,15 @@ SUPPORTED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".pdf"}
 DEFAULT_CHANNEL_NAMES = {"thu-chi", "thu chi", "thu–chi"}
 SOURCE_MARKER = "RAVEN-AI-SOURCE:"
 BUNDLE_WINDOW_SECONDS = 120
+RAVEN_BLOCK_HTML_RE = re.compile(r"^<(?:p|h[1-6]|blockquote|pre|ul|ol|table|hr)(?:\s|>|/)", re.IGNORECASE)
+
+
+def _to_raven_html(text: str | None) -> str:
+	"""Return block HTML so Raven v3 renders message formatting instead of literal tags."""
+	text = (text or "").strip()
+	if not text or RAVEN_BLOCK_HTML_RE.match(text):
+		return text
+	return f"<p>{text}</p>"
 
 
 def on_raven_message(doc, method=None):
@@ -655,7 +664,7 @@ def _send_bot_message(channel_id, text, message_json=None):
 	return frappe.get_doc({
 		"doctype": "Raven Message",
 		"channel_id": channel_id,
-		"text": text,
+		"text": _to_raven_html(text),
 		"message_type": "Text",
 		"is_bot_message": 1,
 		"bot": bot_user,

@@ -5,7 +5,7 @@ import frappe
 from frappe import _
 from frappe.utils import flt, get_number_format_info, now_datetime
 
-from my_custom_app.raven.accounting_agent import _collect_files, _create_draft
+from my_custom_app.raven.accounting_agent import _collect_files, _create_draft, _to_raven_html
 from my_custom_app.raven.settings import (
 	expense_accounts,
 	get_channel_settings,
@@ -268,6 +268,7 @@ def _update_card(request, doc=None):
 			f"<a href=\"/app/raven-accounting-request/{request.name}?open_accounting_dialog=1\">"
 			f"Mở form tạo chứng từ</a>."
 		)
+	message.text = _to_raven_html(message.text)
 	message.flags.is_ai_streaming = True
 	message.save(ignore_permissions=True)
 
