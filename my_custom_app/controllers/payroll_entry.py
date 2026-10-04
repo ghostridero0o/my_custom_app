@@ -117,6 +117,7 @@ class CustomPayrollEntry(PayrollEntry):
 		submitted_salary_slips: list | None = None,
 		submit_journal_entry=False,
 		employee_wise_accounting_enabled=False,
+		title=None,
 	) -> str:
 		multi_currency = 0
 		if len(currencies) > 1:
@@ -135,7 +136,7 @@ class CustomPayrollEntry(PayrollEntry):
 		journal_entry.multi_currency = multi_currency
 
 		if voucher_type == "Journal Entry":
-			journal_entry.title = payroll_payable_account
+			journal_entry.title = title or payroll_payable_account
 
 		journal_entry.save(ignore_permissions=True)
 
@@ -223,15 +224,17 @@ class CustomPayrollEntry(PayrollEntry):
 				amount_against_project = row.get('amount', 0) * row.get('percentage', 0) / 100
 
 			if amount_against_project != 0:
-				salary_components.append({
-					"salary_component": row.get('salary_component', ''),
-					"amount": amount_against_project,
-					"parentfield": row.get('parentfield', ''),
-					"additional_salary": row.get('additional_salary', None),
-					"salary_structure": row.get('salary_structure', ''),
-					"employee": row.get('employee', ''),
-					"project": row.get('project', '')
-				})
+				salary_components.append(
+					frappe._dict({
+						"salary_component": row.get('salary_component', ''),
+						"amount": amount_against_project,
+						"parentfield": row.get('parentfield', ''),
+						"additional_salary": row.get('additional_salary', None),
+						"salary_structure": row.get('salary_structure', ''),
+						"employee": row.get('employee', ''),
+						"project": row.get('project', '')
+					})
+				)
 
 		return salary_components
 
