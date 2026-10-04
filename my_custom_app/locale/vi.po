@@ -822,7 +822,7 @@ msgstr ""
 "<p><strong>Ví dụ Điều kiện:</strong></p>\n"
 "<pre>doc.status==\"Open\"<br>doc.due_date==nowdate()<br>doc.total &gt; "
 "40000\n"
-"</pre>\n"
+"</pre>"
 
 #. Content of the 'Condition description' (HTML) field in DocType 'Web Form'
 #: frappe/website/doctype/web_form/web_form.json
@@ -29959,7 +29959,6 @@ msgstr "Đã tải lên Google Drive"
 #. Description of the 'Value to Validate' (Data) field in DocType 'Onboarding
 #. Step'
 #: frappe/desk/doctype/onboarding_step/onboarding_step.json
-#, python-format
 msgid "Use % for any non empty value."
 msgstr "Sử dụng % cho bất kỳ giá trị không trống nào."
 
@@ -34183,6 +34182,7 @@ msgid ""
 "\t\t\t\tSo please ensure the stock levels are adjusted as soon as possible "
 "to maintain the correct valuation rate."
 msgstr ""
+"\n"
 "Lô {0} của mặt hàng {1} có tồn kho âm trong kho {2}{3}.\n"
 "\t\t\t\tVui lòng thêm số lượng tồn kho là {4} để tiến hành với mục này.\n"
 "\t\t\t\tNếu không thể tạo bút toán điều chỉnh, vui lòng bật 'Cho phép tồn "
@@ -34420,19 +34420,16 @@ msgstr "% Đã trả lại"
 #. Description of the '% Amount Billed' (Percent) field in DocType 'Sales
 #. Order'
 #: erpnext/selling/doctype/sales_order/sales_order.json
-#, python-format
 msgid "% of materials billed against this Sales Order"
 msgstr "% nguyên vật liệu đã thanh toán cho Đơn hàng bán này"
 
 #. Description of the '% Delivered' (Percent) field in DocType 'Pick List'
 #: erpnext/stock/doctype/pick_list/pick_list.json
-#, python-format
 msgid "% of materials delivered against this Pick List"
 msgstr "% nguyên vật liệu đã giao cho Danh sách chọn này"
 
 #. Description of the '%  Delivered' (Percent) field in DocType 'Sales Order'
 #: erpnext/selling/doctype/sales_order/sales_order.json
-#, python-format
 msgid "% of materials delivered against this Sales Order"
 msgstr "% nguyên vật liệu đã giao cho Đơn hàng bán này"
 
@@ -35271,7 +35268,7 @@ msgstr ""
 "\n"
 "&lt;a href=\"{{ payment_url }}\"&gt; nhấp vào đây để thanh toán &lt;/a&gt;\n"
 "\n"
-"</pre>"
+"</pre>\n"
 
 #. Header text in the Stock Workspace
 #: erpnext/stock/workspace/stock/stock.json
@@ -57380,6 +57377,9 @@ msgid ""
 "will be prorated if deferred revenue or expense is not booked for an entire "
 "month"
 msgstr ""
+"Nếu chọn \"Tháng\", một số tiền cố định sẽ được ghi nhận là doanh thu hoặc "
+"chi phí trả trước cho mỗi tháng, bất kể số ngày trong tháng. Số tiền sẽ được "
+"phân bổ tỷ lệ nếu doanh thu hoặc chi phí trả trước không được ghi nhận cho cả tháng"
 
 #. Description of the 'Reconcile on Advance Payment Date' (Check) field in
 #. DocType 'Company'
@@ -57390,6 +57390,10 @@ msgid ""
 "If <b>Disabled</b> - Reconciliation happens on oldest of 2 Dates: <b>Invoice "
 "Date</b> or the <b>Advance Payment posting date</b><br>\n"
 msgstr ""
+"Nếu <b>Bật</b> - Việc đối soát sẽ diễn ra vào <b>Ngày hạch toán thanh toán "
+"trước</b><br>\n"
+"Nếu <b>Tắt</b> - Việc đối soát sẽ diễn ra vào ngày sớm nhất trong 2 ngày: "
+"<b>Ngày hóa đơn</b> hoặc <b>Ngày hạch toán thanh toán trước</b><br>\n"
 
 #: erpnext/accounts/doctype/loyalty_program/loyalty_program.js:34
 msgid ""
@@ -74329,7 +74333,6 @@ msgid "Profitability Analysis"
 msgstr "Phân tích khả năng sinh lời"
 
 #: erpnext/projects/doctype/task/task.py:156
-#, python-format
 msgid "Progress % for a task cannot be more than 100."
 msgstr "Tiến độ % cho một nhiệm vụ không thể lớn hơn 100."
 
@@ -80119,7 +80122,6 @@ msgstr ""
 "mặt hàng hoặc tài khoản mặc định trong công ty mẹ"
 
 #: erpnext/manufacturing/doctype/bom/bom.py:346
-#, python-format
 msgid ""
 "Row #{0}: Process Loss Percentage should be less than 100% for {1} Item {2}"
 msgstr ""
@@ -97008,7 +97010,6 @@ msgid "{0}% Delivered"
 msgstr "{0}% Đã giao"
 
 #: erpnext/accounts/doctype/payment_term/payment_term.js:15
-#, python-format
 msgid "{0}% of total invoice value will be given as discount."
 msgstr "{0}% của tổng giá trị hóa đơn sẽ được giảm giá."
 
