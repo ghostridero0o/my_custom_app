@@ -247,12 +247,22 @@ class CustomPayrollEntry(PayrollEntry):
 		salary_components = self.get_salary_components(component_type)
 		if salary_components:
 			component_dict = {}
+			uses_bulk_advance_deductions = hasattr(self, "get_advance_deductions")
+			advance_deductions = (
+				self.get_advance_deductions(component_type, salary_components)
+				if uses_bulk_advance_deductions
+				else {}
+			)
 
 			for item in salary_components:
 				employee_cost_centers = self.get_payroll_cost_centers_for_employee(
 					item['employee'], item['salary_structure']
 				)
-				employee_advance = self.get_advance_deduction(component_type, item)
+				employee_advance = (
+					advance_deductions.get(item.get("additional_salary"))
+					if uses_bulk_advance_deductions
+					else self.get_advance_deduction(component_type, item)
+				)
 
 				for cost_center, percentage in employee_cost_centers.items():
 					amount_against_cost_center = flt(item['amount']) * percentage / 100
