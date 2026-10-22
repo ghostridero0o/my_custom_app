@@ -141,13 +141,14 @@ def execute(filters=None):
 
 
 def get_earning_and_deduction_types(salary_slips):
-	salary_component_and_type = {_("Earning"): [], _("Deduction"): []}
+	# Classify historical rows by their Salary Slip table, not the current
+	# Salary Component type, which may have changed since the slip was created.
+	components = {"earnings": set(), "deductions": set()}
+	for row in get_salary_components(salary_slips):
+		if row.parentfield in components:
+			components[row.parentfield].add(row.salary_component)
 
-	for salary_component in get_salary_components(salary_slips):
-		component_type = get_salary_component_type(salary_component)
-		salary_component_and_type[_(component_type)].append(salary_component)
-
-	return sorted(salary_component_and_type[_("Earning")]), sorted(salary_component_and_type[_("Deduction")])
+	return sorted(components["earnings"]), sorted(components["deductions"])
 
 
 def get_component_total(component_map, component_prefixes):
@@ -574,9 +575,9 @@ def get_salary_components(salary_slips):
 	return (
 		frappe.qb.from_(salary_detail)
 		.where((salary_detail.amount != 0) & (salary_detail.parent.isin([d.name for d in salary_slips])))
-		.select(salary_detail.salary_component)
+		.select(salary_detail.parentfield, salary_detail.salary_component)
 		.distinct()
-	).run(pluck=True)
+	).run(as_dict=True)
 
 
 def get_salary_component_type(salary_component):
