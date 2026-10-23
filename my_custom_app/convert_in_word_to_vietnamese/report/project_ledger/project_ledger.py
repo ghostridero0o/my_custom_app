@@ -99,6 +99,9 @@ def get_cash_flow_data(filters):
     total_in = sum(r["amount"] for r in cash_in)
     total_out = sum(r["amount"] for r in cash_out)
 
+    supplemental_out = get_invoice_cash_out(filters, accounts)
+    total_supplemental_out = sum(row["amount"] for row in supplemental_out)
+
     # ==== Các khoản giải ngân (3411, 3412) ====
     disburse_accounts = frappe.get_all("Account", filters={"account_number": ["in", ["3411", "3412"]]}, pluck="name")
     disburse = []
@@ -194,6 +197,11 @@ def get_cash_flow_data(filters):
         data.append({"account": "<b>Cash Out</b>", "amount": total_out, "remarks": "Total"})
         data.extend(cash_out)
 
+    if supplemental_out:
+        data.append({"account": "<b>Cash Out bổ sung từ Purchase Invoice</b>",
+                     "amount": total_supplemental_out, "remarks": "Phân bổ thanh toán chưa có Project"})
+        data.extend(supplemental_out)
+
     if disburse:
         data.append({"account": "<b>Các khoản giải ngân để thanh toán</b>", "amount": total_disburse, "remarks": "Tài khoản 3411/3412"})
         data.extend(disburse)
@@ -202,11 +210,93 @@ def get_cash_flow_data(filters):
         data.append({"account": "<b>Nhân công trực tiếp</b>", "amount": total_nhan_cong, "remarks": "Tài khoản 6221 / 3349"})
         data.extend(nhan_cong)
 
-    net_cash = total_in - total_out - total_disburse - total_nhan_cong
-    data.append({"account": "<b>Net Cash Flow</b>", "amount": net_cash, "remarks": "Cash In - Cash Out - Nhân công"})
+    net_cash = total_in - total_out - total_supplemental_out - total_disburse - total_nhan_cong
+    data.append({"account": "<b>Net Cash Flow</b>", "amount": net_cash, "remarks": "Cash In - Cash Out - Cash Out bổ sung - Giải ngân - Nhân công"})
 
     return data
 
+
+
+def get_invoice_project_shares(invoice):
+    """Allocate gross settlement by absolute item net value, including unassigned items.
+
+    Header project is the fallback for items without a project. Tax and charges
+    follow the same proportions; they are not counted as additional cash.
+    """
+    weights = {}
+    for item in invoice.get("items", []):
+        project = item.get("project") or invoice.get("project")
+        weights[project] = weights.get(project, 0) + abs(flt(item.get("base_net_amount")))
+    total = sum(weights.values())
+    if not total:
+        return {invoice.project: 1} if invoice.get("project") else {}
+    return {project: weight / total for project, weight in weights.items() if project}
+
+
+def get_invoice_cash_out(filters, cash_accounts):
+    """Supplement only unassigned cash GL rows omitted by the project filter.
+
+    Payment Entry references supply invoice allocation, while GL credit supplies
+    actual cash in company currency. Never add invoice face value to cash flow.
+    Non-cash settlements and advances without invoice references stay excluded.
+    """
+    if not filters.get("project"):
+        return []
+
+    gl_filters = get_common_filters(filters)
+    gl_filters.pop("project", None)
+    gl_filters.update({
+        "account": ["in", cash_accounts],
+        "voucher_type": "Payment Entry",
+        "voucher_subtype": ["!=", "Internal Transfer"],
+        "project": ["is", "not set"],
+        "credit": [">", 0],
+    })
+    if filters.get("voucher_type") and filters.voucher_type != "Payment Entry":
+        return []
+
+    entries = frappe.get_all("GL Entry", filters=gl_filters, fields=[
+        "posting_date", "account", "cost_center", "remarks", "voucher_type",
+        "voucher_subtype", "voucher_no", "against", "party_type", "party", "credit",
+    ], order_by="posting_date asc, name asc")
+    payments, invoices = {}, {}
+    rows = []
+    for entry in entries:
+        if entry.voucher_no not in payments:
+            payments[entry.voucher_no] = frappe.get_doc("Payment Entry", entry.voucher_no)
+        payment = payments[entry.voucher_no]
+        if payment.docstatus != 1 or payment.payment_type != "Pay" or payment.party_type != "Supplier":
+            continue
+
+        # Positive references share actual cash; reserve the unallocated advance.
+        # Credit notes reduce settlement, rather than generating extra cash out.
+        positive_total = sum(max(flt(ref.allocated_amount), 0) for ref in payment.references)
+        denominator = max(positive_total + max(flt(payment.unallocated_amount), 0),
+                          flt(payment.received_amount))
+        if denominator <= 0:
+            continue
+        for ref in payment.references:
+            if ref.reference_doctype != "Purchase Invoice" or flt(ref.allocated_amount) <= 0:
+                continue
+            if ref.reference_name not in invoices:
+                invoices[ref.reference_name] = frappe.get_doc("Purchase Invoice", ref.reference_name)
+            invoice = invoices[ref.reference_name]
+            if invoice.docstatus != 1 or invoice.company != filters.company or invoice.get("is_return"):
+                continue
+            shares = get_invoice_project_shares(invoice)
+            for project, share in shares.items():
+                if project not in filters.project:
+                    continue
+                amount = flt(entry.credit) * flt(ref.allocated_amount) / denominator * share
+                if amount <= 0:
+                    continue
+                row = dict(entry)
+                row.pop("credit", None)
+                row["amount"] = amount
+                row["remarks"] = "Purchase Invoice: {0}; Project: {1}. {2}".format(
+                    invoice.name, project, entry.remarks or "")
+                rows.append(row)
+    return rows
 
 
 def get_profit_and_loss_data(filters):
