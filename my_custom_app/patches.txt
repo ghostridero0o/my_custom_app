@@ -1,4 +1,6 @@
 [pre_model_sync]
+my_custom_app.patches.rename_custom_accounts_payable
+my_custom_app.patches.rename_custom_accounts_receivable
 # Patches added in this section will be executed before doctypes are migrated
 # Read docs to understand patches: https://frappeframework.com/docs/v14/user/en/database-migrations
 my_custom_app.patches.rename_monthly_attendance_report

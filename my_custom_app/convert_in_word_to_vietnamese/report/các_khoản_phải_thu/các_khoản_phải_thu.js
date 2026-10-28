@@ -1,8 +1,14 @@
 // Copyright (c) 2015, Frappe Technologies Pvt. Ltd. and Contributors
 // License: GNU General Public License v3. See license.txt
 
-frappe.query_reports["Custom Accounts Payable"] = {
+frappe.provide("erpnext.utils");
+
+frappe.query_reports["Các Khoản Phải Thu"] = {
 	filters: [
+        {fieldname: "view", label: __("Chế độ xem"), fieldtype: "Select",
+          options: ["Tổng hợp khách hàng", "Chi tiết hóa đơn", "Chi tiết thu tiền", "Chi tiết công nợ"], default: "Tổng hợp khách hàng"},
+        {fieldname: "unassigned_project", label: __("Chưa xác định Project"), fieldtype: "Check"},
+
 		{
 			fieldname: "company",
 			label: __("Company"),
@@ -44,57 +50,16 @@ frappe.query_reports["Custom Accounts Payable"] = {
 			options: "Project",
 		},
 		{
-			fieldname: "party_account",
-			label: __("Payable Account"),
-			fieldtype: "Link",
-			options: "Account",
-			get_query: () => {
-				var company = frappe.query_report.get_filter_value("company");
-				return {
-					filters: {
-						company: company,
-						account_type: "Payable",
-						is_group: 0,
-					},
-				};
-			},
-		},
-		{
-			fieldname: "ageing_based_on",
-			label: __("Ageing Based On"),
-			fieldtype: "Select",
-			options: "Posting Date\nDue Date\nSupplier Invoice Date",
-			default: "Due Date",
-		},
-		{
-			fieldname: "calculate_ageing_with",
-			label: __("Calculate Ageing With"),
-			fieldtype: "Select",
-			options: "Report Date\nToday Date",
-			default: "Report Date",
-		},
-		{
-			fieldname: "range",
-			label: __("Ageing Range"),
-			fieldtype: "Data",
-			default: "30, 60, 90, 120",
-		},
-		{
-			fieldname: "payment_terms_template",
-			label: __("Payment Terms Template"),
-			fieldtype: "Link",
-			options: "Payment Terms Template",
-		},
-		{
 			fieldname: "party_type",
 			label: __("Party Type"),
 			fieldtype: "Autocomplete",
 			options: get_party_type_options(),
+            default: "Customer",
 			on_change: function () {
 				frappe.query_report.set_filter_value("party", "");
 				frappe.query_report.toggle_filter_display(
-					"supplier_group",
-					frappe.query_report.get_filter_value("party_type") !== "Supplier"
+					"customer_group",
+					frappe.query_report.get_filter_value("party_type") !== "Customer"
 				);
 			},
 		},
@@ -113,15 +78,77 @@ frappe.query_reports["Custom Accounts Payable"] = {
 			},
 		},
 		{
-			fieldname: "supplier_group",
-			label: __("Supplier Group"),
+			fieldname: "party_account",
+			label: __("Receivable Account"),
 			fieldtype: "Link",
-			options: "Supplier Group",
-			hidden: 1,
+			options: "Account",
+			get_query: () => {
+				var company = frappe.query_report.get_filter_value("company");
+				return {
+					filters: {
+						company: company,
+						account_type: "Receivable",
+						is_group: 0,
+					},
+				};
+			},
+		},
+		{
+			fieldname: "ageing_based_on",
+			label: __("Ageing Based On"),
+			fieldtype: "Select",
+			options: "Posting Date\nDue Date",
+			default: "Due Date",
+		},
+		{
+			fieldname: "calculate_ageing_with",
+			label: __("Calculate Ageing With"),
+			fieldtype: "Select",
+			options: "Report Date\nToday Date",
+			default: "Report Date",
+		},
+		{
+			fieldname: "range",
+			label: __("Ageing Range"),
+			fieldtype: "Data",
+			default: "30, 60, 90, 120",
+		},
+		{
+			fieldname: "customer_group",
+			label: __("Customer Group"),
+			fieldtype: "MultiSelectList",
+			options: "Customer Group",
+			get_data: function (txt) {
+				return frappe.db.get_link_options("Customer Group", txt);
+			},
+		},
+		{
+			fieldname: "payment_terms_template",
+			label: __("Payment Terms Template"),
+			fieldtype: "Link",
+			options: "Payment Terms Template",
+		},
+		{
+			fieldname: "sales_partner",
+			label: __("Sales Partner"),
+			fieldtype: "Link",
+			options: "Sales Partner",
+		},
+		{
+			fieldname: "sales_person",
+			label: __("Sales Person"),
+			fieldtype: "Link",
+			options: "Sales Person",
+		},
+		{
+			fieldname: "territory",
+			label: __("Territory"),
+			fieldtype: "Link",
+			options: "Territory",
 		},
 		{
 			fieldname: "group_by_party",
-			label: __("Group By Supplier"),
+			label: __("Group By Customer"),
 			fieldtype: "Check",
 		},
 		{
@@ -130,13 +157,23 @@ frappe.query_reports["Custom Accounts Payable"] = {
 			fieldtype: "Check",
 		},
 		{
-			fieldname: "show_remarks",
-			label: __("Show Remarks"),
+			fieldname: "show_future_payments",
+			label: __("Show Future Payments"),
 			fieldtype: "Check",
 		},
 		{
-			fieldname: "show_future_payments",
-			label: __("Show Future Payments"),
+			fieldname: "show_delivery_notes",
+			label: __("Show Linked Delivery Notes"),
+			fieldtype: "Check",
+		},
+		{
+			fieldname: "show_sales_person",
+			label: __("Show Sales Person"),
+			fieldtype: "Check",
+		},
+		{
+			fieldname: "show_remarks",
+			label: __("Show Remarks"),
 			fieldtype: "Check",
 		},
 		{
@@ -159,11 +196,6 @@ frappe.query_reports["Custom Accounts Payable"] = {
 			label: __("In Party Currency"),
 			fieldtype: "Check",
 		},
-		{
-			fieldname: "handle_employee_advances",
-			label: __("Handle Employee Advances"),
-			fieldtype: "Check",
-		},
 	],
 
 	formatter: function (value, row, column, data, default_formatter) {
@@ -175,19 +207,22 @@ frappe.query_reports["Custom Accounts Payable"] = {
 	},
 
 	onload: function (report) {
-		report.page.add_inner_button(__("Accounts Payable Summary"), function () {
+        for (const view of ["Tổng hợp khách hàng", "Chi tiết hóa đơn", "Chi tiết thu tiền", "Chi tiết công nợ"]) {
+            report.page.add_inner_button(__(view), () => report.set_filter_value("view", view), __("Chế độ xem"));
+        }
+		report.page.add_inner_button(__("Accounts Receivable Summary"), function () {
 			var filters = report.get_values();
-			frappe.set_route("query-report", "Accounts Payable Summary", { company: filters.company });
+			frappe.set_route("query-report", "Accounts Receivable Summary", { company: filters.company });
 		});
 	},
 };
 
-erpnext.utils.add_dimensions("Custom Accounts Payable", 10);
+erpnext.utils.add_dimensions("Các Khoản Phải Thu", 12);
 
 function get_party_type_options() {
 	let options = [];
 	frappe.db
-		.get_list("Party Type", { filters: { account_type: "Payable" }, fields: ["name"] })
+		.get_list("Party Type", { filters: { account_type: "Receivable" }, fields: ["name"] })
 		.then((res) => {
 			res.forEach((party_type) => {
 				options.push(party_type.name);

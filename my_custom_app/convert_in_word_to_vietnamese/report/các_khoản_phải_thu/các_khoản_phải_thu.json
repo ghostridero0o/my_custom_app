@@ -10,10 +10,10 @@
  "modified": "2026-04-07 00:00:00",
  "modified_by": "Administrator",
  "module": "convert In word to Vietnamese",
- "name": "Custom Accounts Receivable",
+ "name": "Các Khoản Phải Thu",
  "owner": "Administrator",
  "ref_doctype": "Sales Invoice",
- "report_name": "Custom Accounts Receivable",
+ "report_name": "Các Khoản Phải Thu",
  "report_type": "Script Report",
  "roles": [
   {
@@ -28,5 +28,7 @@
   {
    "role": "Auditor"
   }
- ]
+ ],
+ "prepared_report": 0,
+ "disable_prepared_report_automation": 1
 }
