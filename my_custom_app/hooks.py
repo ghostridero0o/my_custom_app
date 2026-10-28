@@ -288,6 +288,7 @@ override_doctype_class = {
 after_install = "my_custom_app.setup.install.after_install"
 
 doctype_js = {
+    "BOM": "public/js/bom.js",
     "Employee Attendance Tool" : "public/js/my.js",
     "Additional Salary": "public/js/additional_salary.js",
     "Stock Entry": "public/js/stock_entry.js",
